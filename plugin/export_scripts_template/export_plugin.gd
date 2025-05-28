@@ -17,8 +17,8 @@ func _exit_tree():
 
 
 class AndroidExportPlugin extends EditorExportPlugin:
-	# TODO: Update to your plugin's name.
-	var _plugin_name = "GodotAndroidPluginTemplate"
+
+	var _plugin_name = "SeekThermalGodotAndroidPlugin"
 
 	func _supports_platform(platform):
 		if platform is EditorExportPlatformAndroid:
@@ -27,16 +27,24 @@ class AndroidExportPlugin extends EditorExportPlugin:
 
 	func _get_android_libraries(platform, debug):
 		if debug:
-			return PackedStringArray([_plugin_name + "/bin/debug/" + _plugin_name + "-debug.aar"])
+			return PackedStringArray([_plugin_name + "/bin/debug/" + _plugin_name + "-debug.aar", _plugin_name + "/bin/debug/seek_android_sdk_4.3.0.2.aar"])
 		else:
-			return PackedStringArray([_plugin_name + "/bin/release/" + _plugin_name + "-release.aar"])
+			return PackedStringArray([_plugin_name + "/bin/release/" + _plugin_name + "-release.aar", _plugin_name + "/bin/debug/seek_android_sdk_4.3.0.2.aar"])
+
+	func _get_android_manifest_activity_element_contents(platform: EditorExportPlatform, debug: bool) -> String:
+		var contents = """
+		<intent-filter>
+			<action android:name="android.hardware.usb.action.USB_DEVICE_ATTACHED" />
+		</intent-filter>
+		<meta-data android:name="android.hardware.usb.action.USB_DEVICE_ATTACHED" android:resource="@xml/seekware_device_filter" />\n
+		"""
+		return contents
 
 	func _get_android_dependencies(platform, debug):
-		# TODO: Add remote dependices here.
 		if debug:
-			return PackedStringArray([])
+			return PackedStringArray(["androidx.appcompat:appcompat:1.7.0", "androidx.lifecycle:lifecycle-extensions:2.2.0"])
 		else:
-			return PackedStringArray([])
+			return PackedStringArray(["androidx.appcompat:appcompat:1.7.0", "androidx.lifecycle:lifecycle-extensions:2.2.0"])
 
 	func _get_name():
 		return _plugin_name

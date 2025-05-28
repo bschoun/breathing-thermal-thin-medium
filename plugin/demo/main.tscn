@@ -1,19 +1,41 @@
-[gd_scene load_steps=2 format=3 uid="uid://cg3hylang5fxn"]
+[gd_scene load_steps=3 format=3 uid="uid://cg3hylang5fxn"]
 
-[ext_resource type="Script" path="res://main.gd" id="1_j0gfq"]
+[ext_resource type="Script" uid="uid://c8plt18rbjh5i" path="res://main.gd" id="1_j0gfq"]
+[ext_resource type="Script" uid="uid://c6ssik6ot8nfu" path="res://addons/SeekThermalGodotAndroidPlugin/seekthermal.gd" id="2_0xm2m"]
 
-[node name="Main" type="Node2D"]
+[node name="Main" type="Node2D" node_paths=PackedStringArray("status_label", "data_label", "stats_label")]
 script = ExtResource("1_j0gfq")
+status_label = NodePath("StatusLabel")
+data_label = NodePath("DataLabel")
+stats_label = NodePath("StatsLabel")
 
-[node name="Button" type="Button" parent="."]
-anchors_preset = 14
-anchor_top = 0.5
-anchor_right = 1.0
-anchor_bottom = 0.5
-offset_left = 40.0
-offset_top = 250.0
-offset_right = 320.0
-offset_bottom = 312.0
-text = "Hello World"
+[node name="StatusLabel" type="Label" parent="."]
+offset_left = -1.0
+offset_top = 37.0
+offset_right = 1149.0
+offset_bottom = 251.0
+text = "Camera not connected"
+horizontal_alignment = 1
 
-[connection signal="pressed" from="Button" to="." method="_on_Button_pressed"]
+[node name="DataLabel" type="Label" parent="."]
+offset_left = 2.0
+offset_top = 218.0
+offset_right = 1152.0
+offset_bottom = 432.0
+text = "[Image data]"
+horizontal_alignment = 1
+
+[node name="StatsLabel" type="Label" parent="."]
+offset_left = 2.0
+offset_top = 437.0
+offset_right = 1152.0
+offset_bottom = 651.0
+text = "[Stats]"
+horizontal_alignment = 1
+
+[node name="SeekThermal" type="Node" parent="."]
+script = ExtResource("2_0xm2m")
+
+[connection signal="camera_connected" from="SeekThermal" to="." method="_on_seek_thermal_camera_connected"]
+[connection signal="camera_disconnected" from="SeekThermal" to="." method="_on_seek_thermal_camera_disconnected"]
+[connection signal="new_image" from="SeekThermal" to="." method="_on_seek_thermal_new_image"]

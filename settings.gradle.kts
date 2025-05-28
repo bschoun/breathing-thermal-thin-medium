@@ -3,6 +3,11 @@ pluginManagement {
         google()
         mavenCentral()
         gradlePluginPortal()
+
+        // TODO: Trying to include libs directory
+        //flatDir {
+        //    dirs("libs")
+        //}
     }
 }
 dependencyResolutionManagement {
@@ -15,6 +20,6 @@ dependencyResolutionManagement {
     }
 }
 
-// TODO: Update project's name.
-rootProject.name = "GodotAndroidPluginTemplate"
+rootProject.name = "SeekThermalGodotAndroidPlugin"
 include(":plugin")
+include(":seek-thermal")

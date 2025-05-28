@@ -1,4 +1,6 @@
 import com.android.build.gradle.internal.tasks.factory.dependsOn
+//configurations.maybeCreate("default")
+//artifacts.add("default", file("seek_android_sdk_4.3.0.2.aar"))
 
 plugins {
     id("com.android.library")
@@ -6,14 +8,14 @@ plugins {
 }
 
 // TODO: Update value to your plugin's name.
-val pluginName = "GodotAndroidPluginTemplate"
+val pluginName = "SeekThermalGodotAndroidPlugin"
 
 // TODO: Update value to match your plugin's package name.
-val pluginPackageName = "org.godotengine.plugin.android.template"
+val pluginPackageName = "com.bschoun.godot.seekthermal"
 
 android {
     namespace = pluginPackageName
-    compileSdk = 33
+    compileSdk = 32
 
     buildFeatures {
         buildConfig = true
@@ -32,14 +34,23 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
-    kotlinOptions {
-        jvmTarget = "17"
+    //kotlinOptions {
+    //    jvmTarget = "17"
+    //}
+}
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(17)
     }
 }
-
 dependencies {
     implementation("org.godotengine:godot:4.3.0.stable")
     // TODO: Additional dependencies should be added to export_plugin.gd as well.
+    implementation("androidx.appcompat:appcompat:1.7.0")
+    implementation("androidx.lifecycle:lifecycle-extensions:2.2.0")
+    //implementation("androidx.lifecycle:lifecycle-runtime:2.5.1")
+    //implementation("androidx.core:core:1.6.0")
+    api(project(":seek-thermal"))
 }
 
 // BUILD TASKS DEFINITION
@@ -50,10 +61,24 @@ val copyDebugAARToDemoAddons by tasks.registering(Copy::class) {
     into("demo/addons/$pluginName/bin/debug")
 }
 
+val copySeekThermalDebugAARToDemoAddons by tasks.registering(Copy::class) {
+    description = "Copies the Seek Thermal AAR binary to the plugin's addons directory"
+    from("../seek-thermal")
+    include("seek_android_sdk_4.3.0.2.aar")
+    into("demo/addons/$pluginName/bin/debug")
+}
+
 val copyReleaseAARToDemoAddons by tasks.registering(Copy::class) {
     description = "Copies the generated release AAR binary to the plugin's addons directory"
     from("build/outputs/aar")
     include("$pluginName-release.aar")
+    into("demo/addons/$pluginName/bin/release")
+}
+
+val copySeekThermalReleaseAARToDemoAddons by tasks.registering(Copy::class) {
+    description = "Copies the Seek Thermal AAR binary to the plugin's addons directory"
+    from("../seek-thermal")
+    include("seek_android_sdk_4.3.0.2.aar")
     into("demo/addons/$pluginName/bin/release")
 }
 
@@ -67,6 +92,10 @@ val copyAddonsToDemo by tasks.registering(Copy::class) {
     dependsOn(cleanDemoAddons)
     finalizedBy(copyDebugAARToDemoAddons)
     finalizedBy(copyReleaseAARToDemoAddons)
+
+    // Copies seek thermal AAR
+    finalizedBy(copySeekThermalDebugAARToDemoAddons)
+    finalizedBy(copySeekThermalReleaseAARToDemoAddons)
 
     from("export_scripts_template")
     into("demo/addons/$pluginName")

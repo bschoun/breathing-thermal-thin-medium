@@ -10,14 +10,22 @@ config_version=5
 
 [application]
 
-config/name="Android Plugin Demo"
+config/name="SeekThermal Plugin"
 run/main_scene="res://main.tscn"
-config/features=PackedStringArray("4.2", "GL Compatibility")
+config/features=PackedStringArray("4.4", "GL Compatibility")
 config/icon="res://icon.svg"
 
 [debug]
 
 settings/stdout/verbose_stdout=true
+
+[dotnet]
+
+project/assembly_name="Android Plugin Demo"
+
+[editor_plugins]
+
+enabled=PackedStringArray("res://addons/SeekThermalGodotAndroidPlugin/plugin.cfg")
 
 [rendering]
 
