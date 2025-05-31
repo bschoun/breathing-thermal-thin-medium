@@ -22,7 +22,7 @@ android {
     }
 
     defaultConfig {
-        minSdk = 21
+        minSdk = 26 // was 21
 
         manifestPlaceholders["godotPluginName"] = pluginName
         manifestPlaceholders["godotPluginPackageName"] = pluginPackageName
@@ -48,8 +48,7 @@ dependencies {
     // TODO: Additional dependencies should be added to export_plugin.gd as well.
     implementation("androidx.appcompat:appcompat:1.7.0")
     implementation("androidx.lifecycle:lifecycle-extensions:2.2.0")
-    //implementation("androidx.lifecycle:lifecycle-runtime:2.5.1")
-    //implementation("androidx.core:core:1.6.0")
+    implementation("org.opencv:opencv:4.11.0")
     api(project(":seek-thermal"))
 }
 

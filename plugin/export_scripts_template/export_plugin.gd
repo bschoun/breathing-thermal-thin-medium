@@ -42,9 +42,9 @@ class AndroidExportPlugin extends EditorExportPlugin:
 
 	func _get_android_dependencies(platform, debug):
 		if debug:
-			return PackedStringArray(["androidx.appcompat:appcompat:1.7.0", "androidx.lifecycle:lifecycle-extensions:2.2.0"])
+			return PackedStringArray(["androidx.appcompat:appcompat:1.7.0", "androidx.lifecycle:lifecycle-extensions:2.2.0", "org.opencv:opencv:4.11.0"])
 		else:
-			return PackedStringArray(["androidx.appcompat:appcompat:1.7.0", "androidx.lifecycle:lifecycle-extensions:2.2.0"])
+			return PackedStringArray(["androidx.appcompat:appcompat:1.7.0", "androidx.lifecycle:lifecycle-extensions:2.2.0", "org.opencv:opencv:4.11.0"])
 
 	func _get_name():
 		return _plugin_name

@@ -1,17 +1,23 @@
 [gd_scene load_steps=3 format=3 uid="uid://cg3hylang5fxn"]
 
 [ext_resource type="Script" uid="uid://c8plt18rbjh5i" path="res://main.gd" id="1_j0gfq"]
-[ext_resource type="Script" uid="uid://c6ssik6ot8nfu" path="res://addons/SeekThermalGodotAndroidPlugin/seekthermal.gd" id="2_0xm2m"]
+[ext_resource type="Script" uid="uid://dqjmoecgmukc" path="res://addons/SeekThermalGodotAndroidPlugin/seekthermal.gd" id="2_0xm2m"]
 
-[node name="Main" type="Node2D" node_paths=PackedStringArray("status_label", "data_label", "stats_label")]
+[node name="Main" type="Node2D" node_paths=PackedStringArray("texture_rect", "status_label", "data_label", "stats_label", "start_stop_button")]
 script = ExtResource("1_j0gfq")
+texture_rect = NodePath("TextureRect")
 status_label = NodePath("StatusLabel")
 data_label = NodePath("DataLabel")
 stats_label = NodePath("StatsLabel")
+start_stop_button = NodePath("StartStopButton")
+
+[node name="SeekThermal" type="Node" parent="."]
+unique_name_in_owner = true
+script = ExtResource("2_0xm2m")
 
 [node name="StatusLabel" type="Label" parent="."]
 offset_left = -1.0
-offset_top = 37.0
+offset_top = 96.0
 offset_right = 1149.0
 offset_bottom = 251.0
 text = "Camera not connected"
@@ -33,9 +39,85 @@ offset_bottom = 651.0
 text = "[Stats]"
 horizontal_alignment = 1
 
-[node name="SeekThermal" type="Node" parent="."]
-script = ExtResource("2_0xm2m")
+[node name="TextureRect" type="TextureRect" parent="."]
+offset_left = 796.0
+offset_top = 196.0
+offset_right = 1116.0
+offset_bottom = 436.0
+
+[node name="StartStopButton" type="Button" parent="."]
+offset_left = 68.0
+offset_top = 180.0
+offset_right = 404.0
+offset_bottom = 299.0
+disabled = true
+toggle_mode = true
+text = "Start camera"
+
+[node name="OptionButton" type="OptionButton" parent="."]
+offset_left = 71.0
+offset_top = 330.0
+offset_right = 401.0
+offset_bottom = 393.0
+selected = 0
+item_count = 18
+popup/item_0/text = "WHITEHOT"
+popup/item_0/id = 0
+popup/item_1/text = "BLACKHOT"
+popup/item_1/id = 1
+popup/item_2/text = "SPECTRA"
+popup/item_2/id = 2
+popup/item_3/text = "PRISM"
+popup/item_3/id = 3
+popup/item_4/text = "TYRIAN"
+popup/item_4/id = 4
+popup/item_5/text = "IRON"
+popup/item_5/id = 5
+popup/item_6/text = "AMBER"
+popup/item_6/id = 6
+popup/item_7/text = "HI"
+popup/item_7/id = 7
+popup/item_8/text = "HILO"
+popup/item_8/id = 8
+popup/item_9/text = "IRON2"
+popup/item_9/id = 9
+popup/item_10/text = "GREEN"
+popup/item_10/id = 10
+popup/item_11/text = "RECON"
+popup/item_11/id = 11
+popup/item_12/text = "BLACK_RECON"
+popup/item_12/id = 12
+popup/item_13/text = "USER0"
+popup/item_13/id = 13
+popup/item_14/text = "USER1"
+popup/item_14/id = 14
+popup/item_15/text = "USER2"
+popup/item_15/id = 15
+popup/item_16/text = "USER3"
+popup/item_16/id = 16
+popup/item_17/text = "USER4"
+popup/item_17/id = 17
+
+[node name="FlipXCheckButton" type="CheckButton" parent="."]
+offset_left = 86.0
+offset_top = 452.0
+offset_right = 176.0
+offset_bottom = 483.0
+text = "Flip X"
+
+[node name="FlipYCheckButton" type="CheckButton" parent="."]
+offset_left = 88.0
+offset_top = 515.0
+offset_right = 178.0
+offset_bottom = 546.0
+text = "Flip Y"
 
 [connection signal="camera_connected" from="SeekThermal" to="." method="_on_seek_thermal_camera_connected"]
 [connection signal="camera_disconnected" from="SeekThermal" to="." method="_on_seek_thermal_camera_disconnected"]
+[connection signal="camera_started" from="SeekThermal" to="." method="_on_seek_thermal_camera_started"]
+[connection signal="camera_stopped" from="SeekThermal" to="." method="_on_seek_thermal_camera_stopped"]
 [connection signal="new_image" from="SeekThermal" to="." method="_on_seek_thermal_new_image"]
+[connection signal="toggled" from="StartStopButton" to="." method="_on_button_toggled"]
+[connection signal="item_selected" from="OptionButton" to="." method="_on_option_button_item_selected"]
+[connection signal="toggled" from="FlipXCheckButton" to="." method="_on_flip_x_check_button_toggled"]
+[connection signal="toggled" from="FlipYCheckButton" to="." method="_on_flip_y_check_button_toggled"]
