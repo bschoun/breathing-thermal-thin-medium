@@ -8,7 +8,10 @@ signal camera_connected(camera_info : String, width : int, height : int)
 signal camera_disconnected
 signal camera_started
 signal camera_stopped
-signal new_image(stats: Dictionary, data : PackedFloat32Array, image : PackedByteArray)
+signal new_image(image : PackedByteArray)
+#signal new_data(stats: Dictionary, data : PackedFloat32Array)
+signal new_data(data : PackedFloat32Array)
+signal new_stats(stats : Dictionary)
 
 var width : int
 var height : int
@@ -23,7 +26,9 @@ func _ready() -> void:
 		_android_plugin.connect("camera_closed", _on_camera_closed)
 		_android_plugin.connect("camera_started", _on_camera_started)
 		_android_plugin.connect("camera_stopped", _on_camera_stopped)
+		_android_plugin.connect("new_data", _on_new_data)
 		_android_plugin.connect("new_image", _on_new_image)
+		_android_plugin.connect("new_stats", _on_new_stats)
 	else:
 		printerr("Couldn't find plugin " + _plugin_name)
 
@@ -46,9 +51,17 @@ func _on_camera_closed() -> void:
 	print("camera disconnected")
 	camera_disconnected.emit()
 
-func _on_new_image(stats : Dictionary, data : PackedFloat32Array, image : PackedByteArray) -> void:
-	#info_text = _android_plugin.getCameraInfoText()
-	new_image.emit(stats, data, image)
+func _on_new_image(image : PackedByteArray):
+	new_image.emit(image)
+
+#func _on_new_data(stats : Dictionary, data : PackedFloat32Array) -> void:
+#	new_data.emit(stats, data)
+
+func _on_new_data(data : PackedFloat32Array) -> void:
+	new_data.emit(data)
+
+func _on_new_stats(stats : Dictionary) -> void:
+	new_stats.emit(stats)
 
 func start_camera() -> void:
 	_android_plugin.setColorPalette(0)
@@ -65,3 +78,39 @@ func set_x_flip(val : bool):
 	
 func set_y_flip(val : bool):
 	_android_plugin.setYFlip(val)
+
+func get_camera_count() -> int:
+	return _android_plugin.getCameraCount()
+
+func suspend_shutter() -> void:
+	_android_plugin.suspendShutter()
+
+func trigger_shutter() -> void:
+	_android_plugin.triggerShutter()
+
+func resume_shutter() -> void:
+	_android_plugin.resumeShutter()
+
+func is_automatic_shutter() -> bool:
+	return _android_plugin.isAutomaticShutter()
+
+func set_image_smoothing(val : bool) -> void:
+	_android_plugin.setImageSmoothing(val)
+
+func get_image_smoothing() -> bool:
+	return _android_plugin.getImageSmoothing()
+
+func set_emissivity(val : float) -> void:
+	_android_plugin.setEmissivity(val)
+
+func get_emissivity() -> float:
+	return _android_plugin.getEmissivity()
+
+#func get_image() -> PackedByteArray:
+#	return _android_plugin.getImage()
+
+#func get_stats() -> Dictionary:
+#	return _android_plugin.getStats()
+
+#func get_data() -> PackedFloat32Array:
+#	return _android_plugin.getData()

@@ -8,6 +8,7 @@ extends Node2D
 
 var w: int
 var h: int
+var img : Image
 
 func _on_seek_thermal_camera_connected(camera_info : String, width : int, height : int) -> void:
 	status_label.text = "Camera connected"
@@ -22,16 +23,11 @@ func _on_seek_thermal_camera_disconnected() -> void:
 	start_stop_button.text = "Start camera"
 	start_stop_button.disabled = true
 
-func _on_seek_thermal_new_image(stats: Dictionary, data: PackedFloat32Array, image: PackedByteArray) -> void:
-	stats_label.text = "Min: (" + str(stats["minX"]) + "," + str(stats["minY"]) + "): %0.2f" % stats["minValue"] + " C\n"
-	stats_label.text += "Max: (" + str(stats["maxX"]) + "," + str(stats["maxY"]) + "): %0.2f" % stats["maxValue"] + " C\n"
-	stats_label.text += "Average: %0.2f" % stats["avg"] + " C\n";
+#func _on_seek_thermal_new_image(image: PackedByteArray) -> void:
 	
-	# Create the image from data
-	#var img : Image = Image.create_from_data(w, h, false, Image.FORMAT_L8, image) # For a single-channel grayscale image (maybe from raw data)
-	var img : Image = Image.create_from_data(w, h, false, Image.FORMAT_RGBA8, image)
-	texture_rect.texture = ImageTexture.create_from_image(img)
-
+#	# Create the image from data
+#	var img : Image = Image.create_from_data(w, h, false, Image.FORMAT_RGBA8, image)
+#	texture_rect.texture = ImageTexture.create_from_image(img)
 
 func _on_seek_thermal_camera_started() -> void:
 	status_label.text = "Camera started"
@@ -41,7 +37,7 @@ func _on_seek_thermal_camera_stopped() -> void:
 	status_label.text = "Camera stopped"
 	start_stop_button.text = "Start camera"
 
-func _on_button_toggled(toggled_on: bool) -> void:
+func _on_button_toggled(_toggled_on: bool) -> void:
 	if start_stop_button.text == "Start camera":
 		%SeekThermal.start_camera()
 	else:
@@ -59,3 +55,25 @@ func _on_flip_x_check_button_toggled(toggled_on: bool) -> void:
 
 func _on_flip_y_check_button_toggled(toggled_on: bool) -> void:
 	$SeekThermal.set_y_flip(toggled_on)
+
+
+func _on_image_smoothing_toggled(toggled_on: bool) -> void:
+	$SeekThermal.set_image_smoothing(toggled_on)
+
+
+func _on_shutter_toggled(toggled_on: bool) -> void:
+	if toggled_on:
+		$SeekThermal.resume_shutter()
+	else:
+		$SeekThermal.suspend_shutter()
+
+
+func _on_seek_thermal_new_image(image: PackedByteArray) -> void:
+	img = Image.create_from_data(w, h, false, Image.FORMAT_RGBA8, image)
+	texture_rect.texture = ImageTexture.create_from_image(img)
+
+
+func _on_seek_thermal_new_stats(stats: Dictionary) -> void:
+	stats_label.text = "Min: (" + str(stats["minX"]) + "," + str(stats["minY"]) + "): %0.2f" % stats["minValue"] + " C\n"
+	stats_label.text += "Max: (" + str(stats["maxX"]) + "," + str(stats["maxY"]) + "): %0.2f" % stats["maxValue"] + " C\n"
+	stats_label.text += "Average: %0.2f" % stats["avg"] + " C\n";

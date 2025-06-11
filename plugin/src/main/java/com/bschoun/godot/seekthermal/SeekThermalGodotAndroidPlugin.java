@@ -2,15 +2,13 @@ package com.bschoun.godot.seekthermal;
 
 // Graphics
 import android.graphics.Bitmap;
-import android.graphics.Matrix;
-import android.graphics.Point;
 
 // Seek Thermal
 import com.thermal.seekware.SeekCamera;
 import com.thermal.seekware.SeekCameraManager;
 import com.thermal.seekware.SeekImage;
 import com.thermal.seekware.SeekImageReader;
-import com.thermal.seekware.Thermography;
+import com.thermal.seekware.SeekUtility;
 
 // Godot
 import org.godotengine.godot.Godot;
@@ -23,32 +21,29 @@ import org.godotengine.godot.plugin.UsedByGodot;
 import org.opencv.android.OpenCVLoader;
 import org.opencv.core.CvType;
 import org.opencv.core.Mat;
+import org.opencv.core.Core.MinMaxLocResult;
+import org.opencv.core.Core;
 
-import java.util.Arrays;
+// Java
 import java.util.HashSet;
 import java.util.Set;
+import java.nio.ByteBuffer;
+import java.nio.ShortBuffer;
 
-import kotlin.UShort;
+// Android
 import android.util.Log;
+import androidx.annotation.NonNull;
 
 public class SeekThermalGodotAndroidPlugin extends GodotPlugin implements SeekImageReader.OnImageAvailableListener {
 
-    private SeekImageReader seekImageReader;        // Access to images without rendering
+    private final SeekCameraManager seekCameraManager;
+    private final SeekImageReader seekImageReader;        // Access to images without rendering
 
     private SeekCamera seekCamera;
 
-    // Data/stats
-    private java.nio.ByteBuffer data;               // Buffer to hold data
-    private Thermography thermography;
-    private Thermography.Spot minSpot;
-    private Thermography.Spot maxSpot;
-    private Point minPoint;
-    private Point maxPoint;
-
     // Image configurations
     private java.nio.ByteBuffer bitmapBytes = null; // Buffer to hold bitmap
-    private Bitmap softwareBitmap = null;           // Software bitmap
-    private Bitmap hardwareBitmap = null;           // Hardware bitmap (to be converted to software bitmap)
+    private Bitmap bitmap = null;           // Hardware bitmap (to be converted to software bitmap)
     private boolean xFlip = false;
     private boolean yFlip = false;
 
@@ -57,9 +52,13 @@ public class SeekThermalGodotAndroidPlugin extends GodotPlugin implements SeekIm
     private int height;
     private String cameraInfoText;
 
+    private Mat shortMat; // Intermediate data in 16-bit shorts
+    private Mat floatMat; // Data as 32-bit floats after conversion to actual values (in C)
+    private short[] shortArray;
+
+
     // List of color palettes that can be indexed (because you can't cast Java enums to ints?)
-    // TODO: maybe there's a better way to do this but I don't care right now
-    private SeekCamera.ColorPalette[] colorPallets = {
+    private final SeekCamera.ColorPalette[] colorPallets = {
         SeekCamera.ColorPalette.WHITEHOT,
         SeekCamera.ColorPalette.BLACKHOT,
         SeekCamera.ColorPalette.SPECTRA,
@@ -90,7 +89,8 @@ public class SeekThermalGodotAndroidPlugin extends GodotPlugin implements SeekIm
 
     private CameraState state;
 
-    private final int _byteOffset = 4;
+    // Initialize to color 0
+    private SeekCamera.ColorPalette _palette = colorPallets[0];
 
     // Callback adapter allows us to run specific functions when the camera changes state
     SeekCamera.StateCallback stateCallback = new SeekCamera.StateCallbackAdapter() {
@@ -103,7 +103,16 @@ public class SeekThermalGodotAndroidPlugin extends GodotPlugin implements SeekIm
             cameraInfoText = seekCamera.toString();
             width = seekCamera.getCharacteristics().getWidth();
             height = seekCamera.getCharacteristics().getHeight();
+
+            // Initialize all of our data storage
+            shortArray = new short[width*height];
+            shortMat = new Mat(height, width, CvType.CV_16UC1);
+            floatMat = new Mat(height, width, CvType.CV_32F);
+
+            // Our state is OPENED
             state = CameraState.OPENED;
+
+            // Tell Godot the camera is opened
             emitSignal("camera_opened");
         }
 
@@ -137,6 +146,52 @@ public class SeekThermalGodotAndroidPlugin extends GodotPlugin implements SeekIm
     };
 
     //region Functions exposed in Godot to control camera and get info
+
+    @UsedByGodot
+    public int getCameraCount() {
+        return seekCameraManager.getUSBDeviceCount();
+    }
+
+    @UsedByGodot
+    public void suspendShutter() {
+        seekCamera.suspendShutter();
+    }
+
+    @UsedByGodot
+    public void triggerShutter() {
+        seekCamera.triggerShutter();
+    }
+
+    @UsedByGodot
+    public void resumeShutter() {
+        seekCamera.resumeShutter();
+    }
+
+    @UsedByGodot
+    public boolean isAutomaticShutter() {
+        return seekCamera.isAutomaticShutter();
+    }
+
+    @UsedByGodot
+    public void setImageSmoothing(boolean value) {
+        seekCamera.setImageSmoothing(value);
+    }
+
+    @UsedByGodot
+    public boolean getImageSmoothing() {
+        return seekCamera.getImageSmoothing();
+    }
+
+    @UsedByGodot
+    public void setEmissivity(float emissivity) {
+        seekCamera.setEmissivity(emissivity);
+    }
+
+    @UsedByGodot
+    public float getEmissivity() {
+        return seekCamera.getEmissivity();
+    }
+
     @UsedByGodot
     public void startCamera() {
         if (state != CameraState.OPENED && state != CameraState.STOPPED) {
@@ -144,6 +199,7 @@ public class SeekThermalGodotAndroidPlugin extends GodotPlugin implements SeekIm
             return;
         }
         seekCamera.createSeekCameraCaptureSession(false, true, true, seekImageReader);
+        seekCamera.setColorPalette(_palette);
     }
 
     @UsedByGodot
@@ -166,12 +222,14 @@ public class SeekThermalGodotAndroidPlugin extends GodotPlugin implements SeekIm
 
     @UsedByGodot
     public void setColorPalette(int palette) {
-        if (palette > colorPallets.length - 1) {
+        if (palette > (colorPallets.length - 1)) {
             Log.d(getPluginName(),"Invalid color palette.");
             return;
         }
-        SeekCamera.ColorPalette p = colorPallets[palette];
-        seekCamera.setColorPalette(p);
+        _palette = colorPallets[palette];
+        if (state == CameraState.STARTED) {
+            seekCamera.setColorPalette(_palette);
+        }
     }
 
     @UsedByGodot
@@ -217,15 +275,17 @@ public class SeekThermalGodotAndroidPlugin extends GodotPlugin implements SeekIm
 
         // Seek thermal camera initialization
         Log.d(getPluginName(), "Initializing Seek Thermal camera...");
-        SeekCameraManager seekCameraManager = new SeekCameraManager(getActivity(), null, stateCallback);
+        seekCameraManager = new SeekCameraManager(getActivity(), null, stateCallback);
         seekImageReader = new SeekImageReader();
         seekImageReader.setOnImageAvailableListener(this);
         Log.d(getPluginName(), "Seek Thermal camera initialized!");
     }
 
+    @NonNull
     @Override
     public String getPluginName() { return "SeekThermalGodotAndroidPlugin"; }
 
+    @NonNull
     @Override
     public Set<SignalInfo> getPluginSignals() {
         // Define the signals this plugin will emit
@@ -237,102 +297,77 @@ public class SeekThermalGodotAndroidPlugin extends GodotPlugin implements SeekIm
         signals.add(new SignalInfo("camera_stopped"));
         signals.add(new SignalInfo("camera_closed"));
         signals.add(new SignalInfo("camera_initialized"));
-        signals.add(new SignalInfo("new_image", Dictionary.class, float[].class, byte[].class));
+        signals.add(new SignalInfo("new_image", byte[].class));
+        signals.add(new SignalInfo("new_stats", Dictionary.class));
+        signals.add(new SignalInfo("new_data", float[].class));
         return signals;
-    }
-
-    private static float[] convertByteArrayToFloatArray(byte[] byteArray) {
-        if (byteArray == null || byteArray.length % 2 != 0) {
-            throw new IllegalArgumentException("The byte array must not be null and its length must be even.");
-        }
-        float[] result = new float[byteArray.length/2];
-        for (int i=0; i < byteArray.length; i+= 2) {
-
-            // Swapped the << 8 for converting from little endian to big endian-ness
-            short val = (short)(((byteArray[i] & 0xFF) | (byteArray[i + 1] & 0xFF) << 8));
-            result[i/2] = Thermography.shortToFloatTemperature(val);
-        }
-        return result;
-    }
-
-    private static Mat convertFloatArrayToMat(float[] floatArray, int rows, int cols) {
-        Mat mat = new Mat(rows, cols, CvType.CV_32F);
-        mat.put(0, 0, floatArray);
-        return mat;
-    }
-
-    private static Bitmap createFlippedBitmap(Bitmap source, boolean xFlip, boolean yFlip) {
-        Matrix matrix = new Matrix();
-        matrix.postScale(xFlip ? -1 : 1, yFlip ? -1 : 1, source.getWidth() / 2f, source.getHeight() / 2f);
-        return Bitmap.createBitmap(source, 0, 0, source.getWidth(), source.getHeight(), matrix, true);
     }
 
     @Override
     public void onImageAvailable(final SeekImage seekImage) {
-        runOnUiThread(() -> {
 
-            // Dictionary will hold min/max statistics
-            Dictionary stats = new Dictionary();
+        // Get the color bitmap (Bitmap.Config is hardware configuration)
+        bitmap = seekImage.getColorBitmap();
 
-            // Get image thermography
-            thermography = seekImage.getThermography();
+        // Flip about x or y if necessary
+        if (xFlip) {
+            bitmap = SeekUtility.flipBitmapHorizontal(bitmap);
+        }
+        if (yFlip) {
+            bitmap = SeekUtility.flipBitmapVertical(bitmap);
+        }
+        // Allocate the bitmap bytes if needed
+        if (bitmapBytes == null) {
+            Log.d(getPluginName(), "Byte count: " + String.valueOf(bitmap.getByteCount()));
+            bitmapBytes = java.nio.ByteBuffer.allocate(bitmap.getByteCount());
+        }
+        // Sets read/write position to 0
+        bitmapBytes.rewind();
 
-            // Min/max temperature point and value
-            minSpot = thermography.getMinSpot();
-            minPoint = minSpot.getCenter();
-            maxSpot = thermography.getMaxSpot();
-            maxPoint = maxSpot.getCenter();
+        // Copy bits from bitmap to the bytebuffer
+        bitmap.copyPixelsToBuffer(bitmapBytes);
 
-            // Get thermal data statistics
-            stats.put("maxX", maxPoint.x);
-            stats.put("maxY", maxPoint.y);
-            stats.put("maxValue", maxSpot.getTemperature().getValue());
-            stats.put("minX", minPoint.x);
-            stats.put("minY", minPoint.y);
-            stats.put("minValue", minSpot.getTemperature().getValue());
-            stats.put("avg", thermography.getThermalData().getAverageTemperature().getValue());
+        emitSignal("new_image", bitmapBytes.array());
 
-            // Get thermal data from camera
-            data = thermography.getThermalData().getBuffer();
+        // Get thermal data from camera and convert to a float Mat
+        ByteBuffer dataBuffer = seekImage.getThermography().getThermalData().getBuffer();
 
-            // For some reason the data in the array is offset by 4, at least for the camera that I have. Found through experimentation. Haven't found documentation as to why
-            byte[] dataSubset = Arrays.copyOfRange(data.array(), _byteOffset, width*height*UShort.SIZE_BYTES+_byteOffset);
+        // Data is represented as a 16-bit short, big-endian
+        ShortBuffer shortBuffer = dataBuffer.asShortBuffer();
 
-            // Convert byte data to float data
-            float[] floatData = convertByteArrayToFloatArray(dataSubset);
+        // Copy the shorts to an array
+        shortBuffer.get(shortArray);
 
-            // Get the color bitmap (Bitmap.Config is hardware configuration)
-            hardwareBitmap = seekImage.getColorBitmap();
-            // Create a software bitmap with the properties of the hardware bitmap
-            if (softwareBitmap == null) {
-                softwareBitmap = Bitmap.createBitmap(null, hardwareBitmap.getWidth(), hardwareBitmap.getHeight(), Bitmap.Config.ARGB_8888, true, hardwareBitmap.getColorSpace());
-            }
+        // Convert the array into a 16-bit Mat
+        shortMat.put(0, 0, shortArray);
 
-            // Copy data from hardware bitmap to software bitmap
-            softwareBitmap = hardwareBitmap.copy(Bitmap.Config.ARGB_8888, true);
+        // Convert the 16-bit Mat to a 32-bit float Mat
+        // Seek algorithm scales shorts by 1/64 and subtracts 40 to get the float values
+        shortMat.convertTo(floatMat, floatMat.type(), (1/64.0f), -40);
 
-            // Flip about x or y if necessary
-            softwareBitmap = createFlippedBitmap(softwareBitmap, xFlip, yFlip);
+        // Flip floatMat appropriately
+        if (xFlip && yFlip) {
+            Core.flip(floatMat, floatMat, -1);
+        }
+        else if (xFlip) {
+            Core.flip(floatMat, floatMat, 1);
+        }
+        else if (yFlip) {
+            Core.flip(floatMat, floatMat, 0);
+        }
 
-            // Allocate the bitmap bytes if needed
-            if (bitmapBytes == null) {
-                bitmapBytes = java.nio.ByteBuffer.allocate(hardwareBitmap.getByteCount());
-            }
-            // Sets read/write position to 0
-            bitmapBytes.rewind();
+        // Using OpenCV for this is FAR more efficient than using Seek's Thermography class functions
+        // Get the min/max locations and values
+        MinMaxLocResult res = Core.minMaxLoc(floatMat);
 
-            // Copy bits from bitmap to the bytebuffer
-            softwareBitmap.copyPixelsToBuffer(bitmapBytes);
-
-            // Grayscale image from data (keeping this as a template for when I want to process with OpenCV)
-            /*Mat mat = convertFloatArrayToMat(floatData, height, width);
-            Mat mat_8u = new Mat(height, width, CvType.CV_8U);
-            mat.convertTo(mat_8u, CvType.CV_8U);
-            byte[] image = new byte[width*height];
-            mat_8u.get(0, 0, image);
-            // Emit signal with statistics and image data
-            emitSignal("new_image", stats, floatData, image);*/
-            emitSignal("new_image", stats, floatData, bitmapBytes.array());
-        });
+        Dictionary stats = new Dictionary();
+        stats.put("maxX", (int)res.maxLoc.x);
+        stats.put("maxY", (int)res.maxLoc.y);
+        stats.put("maxValue", res.maxVal);
+        stats.put("minX", (int)res.minLoc.x);
+        stats.put("minY", (int)res.minLoc.y);
+        stats.put("minValue", res.minVal);
+        stats.put("avg", Core.mean(floatMat).val[0]);
+        emitSignal("new_stats", stats);
     }
 }

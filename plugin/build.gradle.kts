@@ -1,16 +1,12 @@
 import com.android.build.gradle.internal.tasks.factory.dependsOn
-//configurations.maybeCreate("default")
-//artifacts.add("default", file("seek_android_sdk_4.3.0.2.aar"))
 
 plugins {
     id("com.android.library")
     id("org.jetbrains.kotlin.android")
 }
 
-// TODO: Update value to your plugin's name.
 val pluginName = "SeekThermalGodotAndroidPlugin"
 
-// TODO: Update value to match your plugin's package name.
 val pluginPackageName = "com.bschoun.godot.seekthermal"
 
 android {
@@ -44,10 +40,11 @@ java {
     }
 }
 dependencies {
-    implementation("org.godotengine:godot:4.3.0.stable")
+    implementation("org.godotengine:godot:4.4.0.stable") // was 4.3.0
     // TODO: Additional dependencies should be added to export_plugin.gd as well.
     implementation("androidx.appcompat:appcompat:1.7.0")
     implementation("androidx.lifecycle:lifecycle-extensions:2.2.0")
+    //implementation("androidx.work:work-runtime:2.7.1") // new, trying to fix intent issue
     implementation("org.opencv:opencv:4.11.0")
     api(project(":seek-thermal"))
 }
