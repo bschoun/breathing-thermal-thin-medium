@@ -41,10 +41,13 @@ class AndroidExportPlugin extends EditorExportPlugin:
 		return contents
 
 	func _get_android_dependencies(platform, debug):
-		if debug:
-			return PackedStringArray(["androidx.appcompat:appcompat:1.7.0", "androidx.lifecycle:lifecycle-extensions:2.2.0", "org.opencv:opencv:4.11.0"])
-		else:
-			return PackedStringArray(["androidx.appcompat:appcompat:1.7.0", "androidx.lifecycle:lifecycle-extensions:2.2.0", "org.opencv:opencv:4.11.0"])
+		# TODO: if needed, change packages for debug vs release. My packages are the same for each
+		return PackedStringArray(["androidx.appcompat:appcompat:1.7.0", 
+			"androidx.lifecycle:lifecycle-extensions:2.2.0", 
+			"org.opencv:opencv:4.11.0",
+			"org.tensorflow:tensorflow-lite-task-vision:0.4.0",
+			"org.tensorflow:tensorflow-lite-gpu:2.9.0",
+			"org.tensorflow:tensorflow-lite-gpu-delegate-plugin:0.4.0"])
 
 	func _get_name():
 		return _plugin_name

@@ -11,7 +11,7 @@ val pluginPackageName = "com.bschoun.godot.seekthermal"
 
 android {
     namespace = pluginPackageName
-    compileSdk = 32
+    compileSdk = 32 // I get errors when I try to make this higher than 32
 
     buildFeatures {
         buildConfig = true
@@ -41,11 +41,20 @@ java {
 }
 dependencies {
     implementation("org.godotengine:godot:4.4.0.stable") // was 4.3.0
+
     // TODO: Additional dependencies should be added to export_plugin.gd as well.
     implementation("androidx.appcompat:appcompat:1.7.0")
     implementation("androidx.lifecycle:lifecycle-extensions:2.2.0")
-    //implementation("androidx.work:work-runtime:2.7.1") // new, trying to fix intent issue
+
+    // OpenCV dependencies
     implementation("org.opencv:opencv:4.11.0")
+
+    // Tensorflow dependencies
+    implementation("org.tensorflow:tensorflow-lite-task-vision:0.4.0")
+    implementation("org.tensorflow:tensorflow-lite-gpu:2.9.0")
+    implementation("org.tensorflow:tensorflow-lite-gpu-delegate-plugin:0.4.0")
+
+    // Seek Thermal dependency
     api(project(":seek-thermal"))
 }
 

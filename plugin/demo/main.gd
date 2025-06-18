@@ -5,10 +5,14 @@ extends Node2D
 @export var data_label : Label
 @export var stats_label : Label
 @export var start_stop_button : Button
+@export var classes_label : Label
+@export var exhaling_label : Label
 
 var w: int
 var h: int
 var img : Image
+
+var labels = ["Nose", "Mouth wide", "Mouth narrow", "Mouth calm"]
 
 func _on_seek_thermal_camera_connected(camera_info : String, width : int, height : int) -> void:
 	status_label.text = "Camera connected"
@@ -69,7 +73,8 @@ func _on_shutter_toggled(toggled_on: bool) -> void:
 
 
 func _on_seek_thermal_new_image(image: PackedByteArray) -> void:
-	img = Image.create_from_data(w, h, false, Image.FORMAT_RGBA8, image)
+	#img = Image.create_from_data(w, h, false, Image.FORMAT_RGBA8, image)
+	img = Image.create_from_data(w, w, false, Image.FORMAT_L8, image)
 	texture_rect.texture = ImageTexture.create_from_image(img)
 
 
@@ -77,3 +82,16 @@ func _on_seek_thermal_new_stats(stats: Dictionary) -> void:
 	stats_label.text = "Min: (" + str(stats["minX"]) + "," + str(stats["minY"]) + "): %0.2f" % stats["minValue"] + " C\n"
 	stats_label.text += "Max: (" + str(stats["maxX"]) + "," + str(stats["maxY"]) + "): %0.2f" % stats["maxValue"] + " C\n"
 	stats_label.text += "Average: %0.2f" % stats["avg"] + " C\n";
+	
+
+func _on_seek_thermal_new_class(_label: String, _displayName: String, _score: float, _index: int) -> void:
+	classes_label.text = labels[_index] + " (" + str(_index) + "): " + str(_score)
+
+
+func _on_seek_thermal_exhaling_changed(value: bool) -> void:
+	if value:
+		exhaling_label.text = "EXHALING"
+		exhaling_label.label_settings.font_color = Color(0.0, 1.0, 0.0, 1.0)
+	else:
+		exhaling_label.text = "NOT EXHALING"
+		exhaling_label.label_settings.font_color = Color(1.0, 0.0, 0.0, 1.0)

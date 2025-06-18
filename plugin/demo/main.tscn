@@ -1,15 +1,19 @@
-[gd_scene load_steps=3 format=3 uid="uid://cg3hylang5fxn"]
+[gd_scene load_steps=4 format=3 uid="uid://cg3hylang5fxn"]
 
 [ext_resource type="Script" uid="uid://c8plt18rbjh5i" path="res://main.gd" id="1_j0gfq"]
-[ext_resource type="Script" uid="uid://dm0porr22vkry" path="res://addons/SeekThermalGodotAndroidPlugin/seekthermal.gd" id="2_0xm2m"]
+[ext_resource type="Script" uid="uid://7j2jj6n65up2" path="res://addons/SeekThermalGodotAndroidPlugin/seekthermal.gd" id="2_0xm2m"]
 
-[node name="Main" type="Node2D" node_paths=PackedStringArray("texture_rect", "status_label", "data_label", "stats_label", "start_stop_button")]
+[sub_resource type="LabelSettings" id="LabelSettings_0xm2m"]
+font_color = Color(1, 0, 0, 1)
+
+[node name="Main" type="Node2D" node_paths=PackedStringArray("texture_rect", "status_label", "data_label", "stats_label", "start_stop_button", "classes_label")]
 script = ExtResource("1_j0gfq")
 texture_rect = NodePath("TextureRect")
 status_label = NodePath("StatusLabel")
 data_label = NodePath("DataLabel")
 stats_label = NodePath("StatsLabel")
 start_stop_button = NodePath("StartStopButton")
+classes_label = NodePath("ClassesLabel")
 
 [node name="SeekThermal" type="Node" parent="."]
 unique_name_in_owner = true
@@ -33,17 +37,34 @@ horizontal_alignment = 1
 
 [node name="StatsLabel" type="Label" parent="."]
 offset_left = 2.0
-offset_top = 437.0
+offset_top = 369.0
 offset_right = 1152.0
-offset_bottom = 651.0
+offset_bottom = 539.0
 text = "[Stats]"
+horizontal_alignment = 1
+
+[node name="ClassesLabel" type="Label" parent="."]
+offset_left = 4.0
+offset_top = 550.0
+offset_right = 1154.0
+offset_bottom = 649.0
+text = "[Classes]"
+horizontal_alignment = 1
+
+[node name="ExhalingLabel" type="Label" parent="."]
+offset_left = 4.0
+offset_top = 594.0
+offset_right = 1154.0
+offset_bottom = 649.0
+text = "NOT EXHALING"
+label_settings = SubResource("LabelSettings_0xm2m")
 horizontal_alignment = 1
 
 [node name="TextureRect" type="TextureRect" parent="."]
 offset_left = 796.0
 offset_top = 196.0
 offset_right = 1116.0
-offset_bottom = 436.0
+offset_bottom = 516.0
 
 [node name="StartStopButton" type="Button" parent="."]
 offset_left = 68.0
@@ -131,6 +152,8 @@ text = "Shutter"
 [connection signal="camera_disconnected" from="SeekThermal" to="." method="_on_seek_thermal_camera_disconnected"]
 [connection signal="camera_started" from="SeekThermal" to="." method="_on_seek_thermal_camera_started"]
 [connection signal="camera_stopped" from="SeekThermal" to="." method="_on_seek_thermal_camera_stopped"]
+[connection signal="exhaling_changed" from="SeekThermal" to="." method="_on_seek_thermal_exhaling_changed"]
+[connection signal="new_class" from="SeekThermal" to="." method="_on_seek_thermal_new_class"]
 [connection signal="new_image" from="SeekThermal" to="." method="_on_seek_thermal_new_image"]
 [connection signal="new_stats" from="SeekThermal" to="." method="_on_seek_thermal_new_stats"]
 [connection signal="toggled" from="StartStopButton" to="." method="_on_button_toggled"]

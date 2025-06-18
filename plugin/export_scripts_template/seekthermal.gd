@@ -12,6 +12,8 @@ signal new_image(image : PackedByteArray)
 #signal new_data(stats: Dictionary, data : PackedFloat32Array)
 signal new_data(data : PackedFloat32Array)
 signal new_stats(stats : Dictionary)
+signal new_class(label : String, displayName : String, score : float, index : int)
+signal exhaling_changed(value : bool)
 
 var width : int
 var height : int
@@ -29,6 +31,8 @@ func _ready() -> void:
 		_android_plugin.connect("new_data", _on_new_data)
 		_android_plugin.connect("new_image", _on_new_image)
 		_android_plugin.connect("new_stats", _on_new_stats)
+		_android_plugin.connect("new_class", _on_new_class)
+		_android_plugin.connect("exhaling_changed", _on_exhaling_changed)
 	else:
 		printerr("Couldn't find plugin " + _plugin_name)
 
@@ -38,6 +42,12 @@ func _on_camera_opened() -> void:
 	height = _android_plugin.getHeight()
 	camera_info = _android_plugin.getCameraInfoText()
 	camera_connected.emit(camera_info, width, height)
+
+func _on_exhaling_changed(value : bool) -> void:
+	exhaling_changed.emit(value)
+
+func _on_new_class(label : String, displayName : String, score : float, index : int) -> void:
+	new_class.emit(label, displayName, score, index)
 
 func _on_camera_started() -> void:
 	print("camera started")
