@@ -39,6 +39,7 @@ import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 import java.nio.ByteBuffer;
 import java.nio.ShortBuffer;
@@ -58,7 +59,6 @@ public class SeekThermalGodotAndroidPlugin extends GodotPlugin
 
     // Image configurations
     private java.nio.ByteBuffer bitmapBytes = null; // Buffer to hold bitmap
-    private Bitmap bitmap = null;           // Hardware bitmap (to be converted to software bitmap)
     private Bitmap processingBitmap;
 
     // Prepare for input into classifier
@@ -67,11 +67,9 @@ public class SeekThermalGodotAndroidPlugin extends GodotPlugin
     private boolean xFlip = false;
     private boolean yFlip = false;
 
-    private int yOffset;
-
     // Camera info
-    private int width;
-    private int height;
+    private int width = 320;
+    private int height = 240;
     private String cameraInfoText;
 
     private Mat processingMatGray;
@@ -79,7 +77,6 @@ public class SeekThermalGodotAndroidPlugin extends GodotPlugin
     private Mat processingMatGrayMask;
 
     private Mat processingMatColor;
-    private Mat roi;
     private Mat shortMat; // Intermediate data in 16-bit shorts
     private Mat floatMat; // Data as 32-bit floats after conversion to actual values (in C)
 
@@ -87,7 +84,9 @@ public class SeekThermalGodotAndroidPlugin extends GodotPlugin
 
     private Rect roiRect;
 
-    private Mat mask;
+    private Mat mask320x320;
+
+    private Mat mask320x240;
 
     private byte[] scaledBytes;
 
@@ -125,22 +124,20 @@ public class SeekThermalGodotAndroidPlugin extends GodotPlugin
         CLOSED
     }
 
-    // TODO: Make these editable from Godot?
-    private final float MIN_TEMP = 20.0f;
-    private final float MAX_TEMP = 35.0f;
+    private float minTemp = 20.0f;
+    private float maxTemp = 35.0f;
 
     private CameraState state;
 
     // Initialize to color 0
     private SeekCamera.ColorPalette _palette = colorPallets[0];
 
-    private ImageClassifierHelper imageClassifierHelper;
+    private final ImageClassifierHelper imageClassifierHelper;
     private List<Category> classifications;
 
     // Keep track of whether we're exhaling or not (inhaling, holding breath)
     private boolean exhaling = false;
     private float prevMaxMin = -1;
-    private float maxMin = -1;
     private static final float maxMinThresh = 0.5f;
 
 
@@ -170,24 +167,8 @@ public class SeekThermalGodotAndroidPlugin extends GodotPlugin
             processingMatGray = new Mat(width, width, CvType.CV_8U);
             processingMatGrayMask = new Mat(width, width, CvType.CV_8U);
             processingMatColor = new Mat(width, width, CvType.CV_8UC3);
-            yOffset = (width - height)/2;
-            //roi = processingMatGray.submat(yOffset, yOffset + height - 1, 0, width - 1);
+            int yOffset = (width - height) / 2;
             roiRect = new Rect(0, yOffset, width, height);
-
-            // Set up the mask
-            mask = new Mat(width, width, CvType.CV_8U);
-            AssetManager assetManager = getActivity().getAssets();
-            InputStream istr = null;
-            try {
-                istr = assetManager.open("mask.jpg");
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-            Bitmap bmp = BitmapFactory.decodeStream(istr);
-            Mat m = new Mat();
-            Utils.bitmapToMat(bmp, m);
-            Imgproc.cvtColor(m, mask, Imgproc.COLOR_BGR2GRAY);
-
             // Our state is OPENED
             state = CameraState.OPENED;
 
@@ -225,6 +206,16 @@ public class SeekThermalGodotAndroidPlugin extends GodotPlugin
     };
 
     //region Thermal camera Godot functions
+
+    @UsedByGodot
+    public void setMinMaxTemperature(float _minTemp, float _maxTemp) {
+        if (_minTemp >= _maxTemp) {
+            Log.e(getPluginName(), "Min temp must be less than max temp");
+            return;
+        }
+        minTemp = _minTemp;
+        maxTemp = _maxTemp;
+    }
 
     @UsedByGodot
     public int getCameraCount() {
@@ -291,12 +282,20 @@ public class SeekThermalGodotAndroidPlugin extends GodotPlugin
 
     @UsedByGodot
     public void setXFlip(boolean flipped) {
-        xFlip = flipped;
+        if (xFlip != flipped) {
+            Core.flip(mask320x320, mask320x320, 1);
+            Core.flip(mask320x240, mask320x240, 1);
+            xFlip = flipped;
+        }
     }
 
     @UsedByGodot
     public void setYFlip(boolean flipped) {
-        yFlip = flipped;
+        if (yFlip != flipped) {
+            yFlip = flipped;
+            Core.flip(mask320x320, mask320x320, 0);
+            Core.flip(mask320x240, mask320x240, 0);
+        }
     }
 
     @UsedByGodot
@@ -399,11 +398,31 @@ public class SeekThermalGodotAndroidPlugin extends GodotPlugin
 
         // Seek thermal camera initialization
         Log.d(getPluginName(), "Initializing Seek Thermal camera...");
-        seekCameraManager = new SeekCameraManager(getActivity(), null, stateCallback);
+        seekCameraManager = new SeekCameraManager(Objects.requireNonNull(getActivity()), null, stateCallback);
         seekImageReader = new SeekImageReader();
         seekImageReader.setOnImageAvailableListener(this);
 
         Log.d(getPluginName(), "Seek Thermal camera initialized!");
+
+        // Set up the mask
+        mask320x320 = new Mat(width, width, CvType.CV_8U);
+
+        AssetManager assetManager = getActivity().getAssets();
+        InputStream istr = null;
+        try {
+            istr = assetManager.open("mask.jpg");
+        } catch (IOException e) {
+            Log.e(getPluginName(), e.toString());
+        }
+        Bitmap bmp = BitmapFactory.decodeStream(istr);
+        Mat m = new Mat();
+        Utils.bitmapToMat(bmp, m);
+        Imgproc.cvtColor(m, mask320x320, Imgproc.COLOR_BGR2GRAY);
+
+        // Make sure mask is completely black/white, no in-between
+        Imgproc.threshold(mask320x320, mask320x320, 127, 255, Imgproc.THRESH_BINARY);
+        Rect roiRect = new Rect(0, 40, width, height);
+        mask320x240 = mask320x320.submat(roiRect);
     }
 
     @NonNull
@@ -434,7 +453,8 @@ public class SeekThermalGodotAndroidPlugin extends GodotPlugin
     public void onImageAvailable(final SeekImage seekImage) {
 
         // Get the color bitmap (Bitmap.Config is hardware configuration)
-        bitmap = seekImage.getColorBitmap();
+        // Hardware bitmap (to be converted to software bitmap)
+        Bitmap bitmap = seekImage.getColorBitmap();
 
         // Flip about x or y if necessary
         if (xFlip) {
@@ -453,7 +473,6 @@ public class SeekThermalGodotAndroidPlugin extends GodotPlugin
 
         // Copy bits from bitmap to the bytebuffer
         bitmap.copyPixelsToBuffer(bitmapBytes);
-
 
         // Get thermal data from camera and convert to a float Mat
         ByteBuffer dataBuffer = seekImage.getThermography().getThermalData().getBuffer();
@@ -485,7 +504,7 @@ public class SeekThermalGodotAndroidPlugin extends GodotPlugin
 
         // Using OpenCV for this is FAR more efficient than using Seek's Thermography class functions
         // Get the min/max locations and values
-        MinMaxLocResult res = Core.minMaxLoc(floatMat);
+        MinMaxLocResult res = Core.minMaxLoc(floatMat, mask320x240);
 
         Dictionary stats = new Dictionary();
         stats.put("maxX", (int)res.maxLoc.x);
@@ -496,8 +515,8 @@ public class SeekThermalGodotAndroidPlugin extends GodotPlugin
         stats.put("minValue", res.minVal);
         stats.put("avg", Core.mean(floatMat).val[0]);
 
-        maxMin = (float)(res.maxVal - res.minVal);
-
+        // Look at changes be
+        float maxMin = (float) (res.maxVal - res.minVal);
         if (prevMaxMin == -1) {
             prevMaxMin = maxMin;
         }
@@ -506,6 +525,7 @@ public class SeekThermalGodotAndroidPlugin extends GodotPlugin
             emitSignal("exhaling_changed", true);
             exhaling = true;
         }
+        prevMaxMin = maxMin;
 
         scaled = scaleImage(floatMat);
         scaled.get(0, 0, scaledBytes);
@@ -513,7 +533,7 @@ public class SeekThermalGodotAndroidPlugin extends GodotPlugin
         scaled.copyTo(processingMatGray.submat(roiRect));
 
         // Mask the data
-        processingMatGray.copyTo(processingMatGrayMask, mask);
+        processingMatGray.copyTo(processingMatGrayMask, mask320x320);
 
         processingMatGrayMask.get(0, 0, scaledSquareBytes);
 
@@ -521,16 +541,13 @@ public class SeekThermalGodotAndroidPlugin extends GodotPlugin
         Utils.matToBitmap(processingMatColor, processingBitmap);
 
         // If we're exhaling, classify the image to see if we're still exhaling, and what type of exhale
-        if (exhaling) {
-            classifyImage();
-        }
+        //if (exhaling) {
+        classifyImage();
+        //}
 
         emitSignal("new_stats", stats);
         emitSignal("new_image", scaledSquareBytes);
-
-        prevMaxMin = maxMin;
     }
-
 
     /// Scales image between MIN_TEMP and MAX_TEMP, sets to CV_8U
     private Mat scaleImage(Mat image) {
@@ -539,16 +556,16 @@ public class SeekThermalGodotAndroidPlugin extends GodotPlugin
         image.copyTo(result);
 
         // Clip data below minTemp
-        Core.max(result, new Scalar(MIN_TEMP), result);
+        Core.max(result, new Scalar(minTemp), result);
 
         // Clip data above maxTemp
-        Core.min(result, new Scalar(MAX_TEMP), result);
+        Core.min(result, new Scalar(maxTemp), result);
 
         // Subtract min value from image
-        Core.subtract(result, new Scalar(MIN_TEMP), result);
+        Core.subtract(result, new Scalar(minTemp), result);
 
         // Scale to [0,255] and convert to 8-bit unsigned integers
-        result.convertTo(result, CvType.CV_8U, 255.0/(MAX_TEMP - MIN_TEMP));
+        result.convertTo(result, CvType.CV_8U, 255.0/(maxTemp - minTemp));
 
         return result;
     }
