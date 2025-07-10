@@ -23,3 +23,4 @@ dependencyResolutionManagement {
 rootProject.name = "SeekThermalGodotAndroidPlugin"
 include(":plugin")
 include(":seek-thermal")
+include(":seek-thermal")

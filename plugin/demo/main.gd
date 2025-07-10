@@ -93,12 +93,11 @@ func _on_seek_thermal_new_class(_label: String, _displayName: String, _score: fl
 
 
 func _on_seek_thermal_exhaling_changed(value: bool) -> void:
-	'''if value:
+	if value:
 		exhaling_label.text = "EXHALING"
 		exhaling_label.label_settings.font_color = Color(0.0, 1.0, 0.0, 1.0)
 	else:
 		exhaling_label.text = "NOT EXHALING"
-		exhaling_label.label_settings.font_color = Color(1.0, 0.0, 0.0, 1.0)'''
-	if not value:
+		exhaling_label.label_settings.font_color = Color(1.0, 0.0, 0.0, 1.0)
 		classes_label.text = ""
 		classes_label.label_settings.font_color = Color(1.0, 1.0, 1.0, 1.0)

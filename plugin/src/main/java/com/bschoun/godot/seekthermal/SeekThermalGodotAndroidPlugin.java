@@ -93,6 +93,8 @@ public class SeekThermalGodotAndroidPlugin extends GodotPlugin
     private byte[] scaledSquareBytes;
     private short[] shortArray;
 
+    private List<Float> maxMinValues = new ArrayList<>();
+
 
     // List of color palettes that can be indexed (because you can't cast Java enums to ints?)
     private final SeekCamera.ColorPalette[] colorPallets = {
@@ -124,7 +126,7 @@ public class SeekThermalGodotAndroidPlugin extends GodotPlugin
         CLOSED
     }
 
-    private float minTemp = 20.0f;
+    //private float minTemp = 20.0f;
     private float maxTemp = 35.0f;
 
     private CameraState state;
@@ -137,9 +139,12 @@ public class SeekThermalGodotAndroidPlugin extends GodotPlugin
 
     // Keep track of whether we're exhaling or not (inhaling, holding breath)
     private boolean exhaling = false;
-    private float prevMaxMin = -1;
-    private static final float maxMinThresh = 0.5f;
 
+    //private static final float maxMinThresh = 0.5f;
+
+    private static final int nFrames = 27;
+
+    private long exhaleStartTime = 0;
 
 
     /// Thermal Camera things ///
@@ -208,12 +213,7 @@ public class SeekThermalGodotAndroidPlugin extends GodotPlugin
     //region Thermal camera Godot functions
 
     @UsedByGodot
-    public void setMinMaxTemperature(float _minTemp, float _maxTemp) {
-        if (_minTemp >= _maxTemp) {
-            Log.e(getPluginName(), "Min temp must be less than max temp");
-            return;
-        }
-        minTemp = _minTemp;
+    public void setMaxTemperature(float _maxTemp) {
         maxTemp = _maxTemp;
     }
 
@@ -449,6 +449,38 @@ public class SeekThermalGodotAndroidPlugin extends GodotPlugin
         return signals;
     }
 
+    private static float calculateAverage(List<Float> numbers) {
+        if (numbers == null || numbers.isEmpty()) {
+            return 0.0f; // Handle empty or null list to avoid division by zero
+        }
+
+        float sum = 0;
+        for (Float num : numbers) {
+            sum += num;
+        }
+
+        return sum / numbers.size();
+    }
+
+    private static float calculateStandardDeviation(List<Float> data, float mean) {
+        if (data == null || data.isEmpty()) {
+            return 0.0f; // Or throw an IllegalArgumentException
+        }
+
+        // Calculate Sum of Squared Differences
+        float sumOfSquaredDifferences = 0.0f;
+        for (Float value : data) {
+            sumOfSquaredDifferences += (float)Math.pow(value - mean, 2);
+        }
+
+        // Step 4: Calculate the Variance
+        double variance = sumOfSquaredDifferences / data.size(); // For population SD
+
+        // Step 5: Calculate the Standard Deviation
+        return (float)Math.sqrt(variance);
+    }
+
+
     @Override
     public void onImageAvailable(final SeekImage seekImage) {
 
@@ -515,57 +547,74 @@ public class SeekThermalGodotAndroidPlugin extends GodotPlugin
         stats.put("minValue", res.minVal);
         stats.put("avg", Core.mean(floatMat).val[0]);
 
-        // Look at changes be
+        // Subtract the min value from the max value
         float maxMin = (float) (res.maxVal - res.minVal);
-        if (prevMaxMin == -1) {
-            prevMaxMin = maxMin;
+
+        if (maxMinValues.size() == nFrames) {
+            float prevAvg = calculateAverage(maxMinValues);
+            float prevStd = calculateStandardDeviation(maxMinValues, prevAvg);
+
+            if (maxMin > (prevAvg + prevStd*6) && !exhaling) {
+                exhaling = true;
+                emitSignal("exhaling_changed", true);
+                // Store the time that the exhale started
+                exhaleStartTime = System.nanoTime();
+            }
+            else if (maxMin < (prevAvg - prevStd*4) && exhaling) {
+                exhaling = false;
+                emitSignal("exhaling_changed", false);
+            }
+            else if (exhaling && (System.nanoTime() - exhaleStartTime)/1_000_000_000.0f > 7) {
+                exhaling = false;
+                emitSignal("exhaling_changed", false);
+            }
+
+            // Remove the first value to make room for the new value to be appended
+            maxMinValues.remove(0);
         }
 
-        if (maxMin - prevMaxMin > maxMinThresh && !exhaling) {
-            emitSignal("exhaling_changed", true);
-            exhaling = true;
-        }
-        prevMaxMin = maxMin;
+        // Append maxMin to the array maxMinValues
+        maxMinValues.add(maxMin);
 
-        scaled = scaleImage(floatMat);
+        scaled = scaleImage(floatMat, (float)res.minVal, maxTemp);
         scaled.get(0, 0, scaledBytes);
         //scaled.copyTo(roi);
         scaled.copyTo(processingMatGray.submat(roiRect));
 
         // Mask the data
         processingMatGray.copyTo(processingMatGrayMask, mask320x320);
-
         processingMatGrayMask.get(0, 0, scaledSquareBytes);
 
+        // Convert to color
         Imgproc.cvtColor(processingMatGrayMask, processingMatColor, Imgproc.COLOR_GRAY2BGR);
         Utils.matToBitmap(processingMatColor, processingBitmap);
 
         // If we're exhaling, classify the image to see if we're still exhaling, and what type of exhale
-        //if (exhaling) {
-        classifyImage();
-        //}
+        if (exhaling) {
+            classifyImage();
+        }
 
         emitSignal("new_stats", stats);
         emitSignal("new_image", scaledSquareBytes);
     }
 
     /// Scales image between MIN_TEMP and MAX_TEMP, sets to CV_8U
-    private Mat scaleImage(Mat image) {
+    private Mat scaleImage(Mat image, float _minTemp, float _maxTemp) {
 
         Mat result = new Mat();
         image.copyTo(result);
 
         // Clip data below minTemp
-        Core.max(result, new Scalar(minTemp), result);
+        Core.max(result, new Scalar(_minTemp), result);
 
         // Clip data above maxTemp
-        Core.min(result, new Scalar(maxTemp), result);
+        Core.min(result, new Scalar(_maxTemp), result);
 
         // Subtract min value from image
-        Core.subtract(result, new Scalar(minTemp), result);
+        Core.subtract(result, new Scalar(_minTemp), result);
 
         // Scale to [0,255] and convert to 8-bit unsigned integers
-        result.convertTo(result, CvType.CV_8U, 255.0/(maxTemp - minTemp));
+        result.convertTo(result, CvType.CV_8U, 255.0/(_maxTemp - _minTemp));
 
         return result;
     }
@@ -590,10 +639,10 @@ public class SeekThermalGodotAndroidPlugin extends GodotPlugin
         // Sometimes we don't get a category, meaning nothing reached the threshold. If this happens, and we're exhaling,
         // we say that we're no longer exhaling I guess
         if (classifications.isEmpty()) {
-            if (exhaling) {
+            /*if (exhaling) {
                 emitSignal("exhaling_changed", false);
                 exhaling = false;
-            }
+            }*/
             return;
         }
 

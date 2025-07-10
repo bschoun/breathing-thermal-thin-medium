@@ -1,7 +1,7 @@
 [gd_scene load_steps=5 format=3 uid="uid://cg3hylang5fxn"]
 
 [ext_resource type="Script" uid="uid://c8plt18rbjh5i" path="res://main.gd" id="1_j0gfq"]
-[ext_resource type="Script" uid="uid://c70grvb2nlp8x" path="res://addons/SeekThermalGodotAndroidPlugin/seekthermal.gd" id="2_0xm2m"]
+[ext_resource type="Script" uid="uid://beqe5g7m2yyby" path="res://addons/SeekThermalGodotAndroidPlugin/seekthermal.gd" id="2_0xm2m"]
 
 [sub_resource type="LabelSettings" id="LabelSettings_h2yge"]
 
@@ -57,7 +57,6 @@ label_settings = SubResource("LabelSettings_h2yge")
 horizontal_alignment = 1
 
 [node name="ExhalingLabel" type="Label" parent="."]
-visible = false
 offset_left = 4.0
 offset_top = 594.0
 offset_right = 1154.0
