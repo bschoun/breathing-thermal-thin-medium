@@ -1,5 +1,5 @@
 extends Node
-class_name SeekThermal
+#class_name SeekThermal
 
 var _plugin_name = "SeekThermalGodotAndroidPlugin"
 var _android_plugin			# Reference to the plugin
@@ -13,7 +13,7 @@ signal new_image(image : PackedByteArray)
 signal new_data(data : PackedFloat32Array)
 signal new_stats(stats : Dictionary)
 signal new_class(label : String, displayName : String, score : float, index : int)
-signal exhaling_changed(value : bool)
+signal exhaling_changed(value : bool, exhale_type : String)
 
 var width : int
 var height : int
@@ -43,8 +43,8 @@ func _on_camera_opened() -> void:
 	camera_info = _android_plugin.getCameraInfoText()
 	camera_connected.emit(camera_info, width, height)
 
-func _on_exhaling_changed(value : bool) -> void:
-	exhaling_changed.emit(value)
+func _on_exhaling_changed(value : bool, exhale_type : String) -> void:
+	exhaling_changed.emit(value, exhale_type)
 
 func _on_new_class(label : String, displayName : String, score : float, index : int) -> void:
 	new_class.emit(label, displayName, score, index)
@@ -72,6 +72,9 @@ func _on_new_data(data : PackedFloat32Array) -> void:
 
 func _on_new_stats(stats : Dictionary) -> void:
 	new_stats.emit(stats)
+
+func get_state() -> int:
+	return _android_plugin.getState()
 
 func start_camera() -> void:
 	_android_plugin.setColorPalette(0)

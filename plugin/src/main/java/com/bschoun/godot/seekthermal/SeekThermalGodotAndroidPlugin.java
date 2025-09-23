@@ -25,6 +25,7 @@ import org.opencv.core.CvType;
 import org.opencv.core.Mat;
 import org.opencv.core.Core.MinMaxLocResult;
 import org.opencv.core.Core;
+import org.opencv.core.MatOfDouble;
 import org.opencv.core.Scalar;
 import org.opencv.core.Rect;
 
@@ -70,6 +71,13 @@ public class SeekThermalGodotAndroidPlugin extends GodotPlugin
     // Camera info
     private int width = 320;
     private int height = 240;
+
+    private final int FPS = 27;
+
+    private final int LONG_HISTORY = 6;
+    private final int SHORT_HISTORY = 1;
+
+    private final float STD_DEV = 2;
     private String cameraInfoText;
 
     private Mat processingMatGray;
@@ -93,7 +101,9 @@ public class SeekThermalGodotAndroidPlugin extends GodotPlugin
     private byte[] scaledSquareBytes;
     private short[] shortArray;
 
-    private List<Float> maxMinValues = new ArrayList<>();
+    private List<Float> maxHistoryLong = new ArrayList<>();
+    private List<Float> avgHistoryShort = new ArrayList<>();
+    private List<Float> stdHistoryShort = new ArrayList<>();
 
 
     // List of color palettes that can be indexed (because you can't cast Java enums to ints?)
@@ -119,6 +129,7 @@ public class SeekThermalGodotAndroidPlugin extends GodotPlugin
     };
 
     private enum CameraState {
+        NONE,
         INITIALIZED,
         OPENED,
         STARTED,
@@ -129,7 +140,7 @@ public class SeekThermalGodotAndroidPlugin extends GodotPlugin
     //private float minTemp = 20.0f;
     private float maxTemp = 35.0f;
 
-    private CameraState state;
+    private CameraState state = CameraState.NONE;
 
     // Initialize to color 0
     private SeekCamera.ColorPalette _palette = colorPallets[0];
@@ -145,6 +156,9 @@ public class SeekThermalGodotAndroidPlugin extends GodotPlugin
     private static final int nFrames = 27;
 
     private long exhaleStartTime = 0;
+
+    private float exhaleEndThreshold = 0;
+    private float prevMax = 0;
 
 
     /// Thermal Camera things ///
@@ -320,6 +334,10 @@ public class SeekThermalGodotAndroidPlugin extends GodotPlugin
     }
 
     @UsedByGodot
+    public int getState() {
+        return state.ordinal();
+    }
+    @UsedByGodot
     public int getWidth() {
         if (state == CameraState.INITIALIZED || state == CameraState.CLOSED) {
             Log.d(getPluginName(), "Invalid camera state, cannot get width.");
@@ -445,7 +463,8 @@ public class SeekThermalGodotAndroidPlugin extends GodotPlugin
         signals.add(new SignalInfo("new_stats", Dictionary.class));
         signals.add(new SignalInfo("new_data", float[].class));
         signals.add(new SignalInfo("new_class", String.class, String.class, Float.class, Integer.class));
-        signals.add(new SignalInfo("exhaling_changed", Boolean.class));
+        signals.add(new SignalInfo("exhaling_changed", Boolean.class, String.class));
+
         return signals;
     }
 
@@ -534,10 +553,14 @@ public class SeekThermalGodotAndroidPlugin extends GodotPlugin
             Core.flip(floatMat, floatMat, 0);
         }
 
-        // Using OpenCV for this is FAR more efficient than using Seek's Thermography class functions
-        // Get the min/max locations and values
-        MinMaxLocResult res = Core.minMaxLoc(floatMat, mask320x240);
+        // Blur the float data a little
+        Imgproc.medianBlur(floatMat, floatMat, 3);
 
+        // Get the min/max locations and values to find the min
+        MinMaxLocResult res = Core.minMaxLoc(floatMat, mask320x240);
+        //float avg = (float) Core.mean(floatMat, mask320x240).val[0];
+
+        // Store these values in a dictionary
         Dictionary stats = new Dictionary();
         stats.put("maxX", (int)res.maxLoc.x);
         stats.put("maxY", (int)res.maxLoc.y);
@@ -545,37 +568,10 @@ public class SeekThermalGodotAndroidPlugin extends GodotPlugin
         stats.put("minX", (int)res.minLoc.x);
         stats.put("minY", (int)res.minLoc.y);
         stats.put("minValue", res.minVal);
-        stats.put("avg", Core.mean(floatMat).val[0]);
+        //stats.put("avg", avg);
+        //stats.put("stdDev", std);
 
-        // Subtract the min value from the max value
-        float maxMin = (float) (res.maxVal - res.minVal);
-
-        if (maxMinValues.size() == nFrames) {
-            float prevAvg = calculateAverage(maxMinValues);
-            float prevStd = calculateStandardDeviation(maxMinValues, prevAvg);
-
-            if (maxMin > (prevAvg + prevStd*6) && !exhaling) {
-                exhaling = true;
-                emitSignal("exhaling_changed", true);
-                // Store the time that the exhale started
-                exhaleStartTime = System.nanoTime();
-            }
-            else if (maxMin < (prevAvg - prevStd*4) && exhaling) {
-                exhaling = false;
-                emitSignal("exhaling_changed", false);
-            }
-            else if (exhaling && (System.nanoTime() - exhaleStartTime)/1_000_000_000.0f > 7) {
-                exhaling = false;
-                emitSignal("exhaling_changed", false);
-            }
-
-            // Remove the first value to make room for the new value to be appended
-            maxMinValues.remove(0);
-        }
-
-        // Append maxMin to the array maxMinValues
-        maxMinValues.add(maxMin);
-
+        Log.d(getPluginName(), "Processing image...");
         scaled = scaleImage(floatMat, (float)res.minVal, maxTemp);
         scaled.get(0, 0, scaledBytes);
         //scaled.copyTo(roi);
@@ -590,12 +586,86 @@ public class SeekThermalGodotAndroidPlugin extends GodotPlugin
         Utils.matToBitmap(processingMatColor, processingBitmap);
 
         // If we're exhaling, classify the image to see if we're still exhaling, and what type of exhale
-        if (exhaling) {
+        // Turning this off for now, I think we can do it statistically
+        /*if (exhaling) {
             classifyImage();
-        }
+        }*/
 
         emitSignal("new_stats", stats);
         emitSignal("new_image", scaledSquareBytes);
+
+
+        // Now let's start detecting exhales
+        // Subtract the min value from the data (within mask)
+        Core.subtract(floatMat, new Scalar(res.minVal), floatMat, mask320x240);
+
+        // Get the average values
+        MatOfDouble mean = new MatOfDouble();
+        MatOfDouble stddev = new MatOfDouble();
+        Core.meanStdDev(floatMat, mean, stddev, mask320x240);
+
+        Log.d(getPluginName(), "Getting max, mean and stddev...");
+
+        float avg = (float) mean.get(0,0)[0];
+        float std = (float) stddev.get(0,0)[0];
+        float max = (float) (res.maxVal - res.minVal);
+
+        Log.d(getPluginName(), "Adding data to history...");
+
+        // Append max, avg and std values to historical arrays
+        maxHistoryLong.add(max);
+        avgHistoryShort.add(avg);
+        stdHistoryShort.add(std);
+
+        // Pop left if our history is filled
+        // TODO: Replace constants with variables
+        if (maxHistoryLong.size() > FPS*LONG_HISTORY) {
+            maxHistoryLong.remove(0);
+        }
+        if (avgHistoryShort.size() > FPS*SHORT_HISTORY) {
+            avgHistoryShort.remove(0);
+        }
+        if (stdHistoryShort.size() > FPS*SHORT_HISTORY) {
+            stdHistoryShort.remove(0);
+        }
+
+        Log.d(getPluginName(), "Calculating averages...");
+        
+        // Average the historical windows
+        float avgHistoryMean = calculateAverage(avgHistoryShort);
+        float stdHistoryMean = calculateAverage(stdHistoryShort);
+        float maxHistoryMean = calculateAverage(maxHistoryLong);
+
+        Log.d(getPluginName(), "Determining exhale/inhale...");
+        if (!exhaling) {
+            if (max > (avgHistoryMean + stdHistoryMean*STD_DEV)) {
+                exhaling = true;
+                // We're looking for a rise in the average over historical average of greater than 0.25C
+                if (avg - avgHistoryMean >= 0.25f) {
+                    emitSignal("exhaling_changed", true, "WAFT");
+                }
+                else {
+                    emitSignal("exhaling_changed", true, "GALE");
+                    // TODO: How do we somehow communicate left/right/up/down?
+                }
+                // Store the time that the exhale started
+                exhaleStartTime = System.nanoTime();
+                exhaleEndThreshold = ((avgHistoryMean + stdHistoryMean*STD_DEV) + prevMax)/2.0f;
+            }
+        }
+        else {
+            //if (max < maxHistoryMean) {
+            if (max < exhaleEndThreshold) {
+                exhaling = false;
+                emitSignal("exhaling_changed", false, "");
+            }
+            // Check for timeout (six seconds or longer exhale)
+            else if ((System.nanoTime() - exhaleStartTime)/1_000_000_000.0f > LONG_HISTORY) {
+                exhaling = false;
+                emitSignal("exhaling_changed", false, "");
+            }
+        }
+        prevMax = max;
     }
 
     /// Scales image between MIN_TEMP and MAX_TEMP, sets to CV_8U
