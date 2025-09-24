@@ -1,4 +1,0 @@
-0 Nose
-1 Mouth wide
-2 Mouth narrow
-3 Mouth calm

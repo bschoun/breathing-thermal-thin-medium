@@ -47,7 +47,8 @@ public class ImageClassifierHelper {
     private final ClassifierListener imageClassifierListener;
     private ImageClassifier imageClassifier;
 
-    String modelName = "converted_tflite_quantized/model.tflite";
+    //String modelName = "converted_tflite_quantized/model.tflite";
+    String modelName = "converted_tflite/model_unquant.tflite";
 
     /** Helper class for wrapping Image Classification actions */
     public ImageClassifierHelper(Float threshold,

@@ -25,7 +25,6 @@ import org.opencv.core.CvType;
 import org.opencv.core.Mat;
 import org.opencv.core.Core.MinMaxLocResult;
 import org.opencv.core.Core;
-import org.opencv.core.MatOfDouble;
 import org.opencv.core.Scalar;
 import org.opencv.core.Rect;
 
@@ -38,6 +37,7 @@ import org.tensorflow.lite.support.label.Category;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
@@ -88,6 +88,8 @@ public class SeekThermalGodotAndroidPlugin extends GodotPlugin
     private Mat shortMat; // Intermediate data in 16-bit shorts
     private Mat floatMat; // Data as 32-bit floats after conversion to actual values (in C)
 
+    private Mat diffMat;
+
     private Mat scaled;
 
     private Rect roiRect;
@@ -95,6 +97,10 @@ public class SeekThermalGodotAndroidPlugin extends GodotPlugin
     private Mat mask320x320;
 
     private Mat mask320x240;
+
+    private Mat mask320x240Inverse;
+
+    private Mat movingAverageMat;
 
     private byte[] scaledBytes;
 
@@ -137,6 +143,12 @@ public class SeekThermalGodotAndroidPlugin extends GodotPlugin
         CLOSED
     }
 
+    private enum ExhaleType {
+        NONE,
+        GALE,
+        WAFT,
+    }
+
     //private float minTemp = 20.0f;
     private float maxTemp = 35.0f;
 
@@ -160,6 +172,18 @@ public class SeekThermalGodotAndroidPlugin extends GodotPlugin
     private float exhaleEndThreshold = 0;
     private float prevMax = 0;
 
+    private boolean initialized = false;
+
+    private final Scalar blackColor = new Scalar(0,0,0);
+
+    private static int totalPixels;
+
+    private boolean classify = true;
+
+    private ExhaleType exhaleType = ExhaleType.NONE;
+
+    private float debounce = 1.0f;
+
 
     /// Thermal Camera things ///
 
@@ -175,21 +199,28 @@ public class SeekThermalGodotAndroidPlugin extends GodotPlugin
             width = seekCamera.getCharacteristics().getWidth();
             height = seekCamera.getCharacteristics().getHeight();
 
+            totalPixels = width*height;
+
             // Initialize all of our data storage
-            shortArray = new short[width*height];
+            shortArray = new short[totalPixels];
             shortMat = new Mat(height, width, CvType.CV_16UC1);
             floatMat = new Mat(height, width, CvType.CV_32F);
+            movingAverageMat = new Mat(height, width, CvType.CV_32F);
+            diffMat = new Mat(height, width, CvType.CV_32F);
             scaled = new Mat(height, width, CvType.CV_8U);
-            scaledBytes = new byte[width * height];
+            scaledBytes = new byte[totalPixels];
             scaledSquareBytes = new byte[width * width];
             processingBitmap = Bitmap.createBitmap(width, width, Bitmap.Config.ARGB_8888);
             processingMatGray = new Mat(width, width, CvType.CV_8U);
             processingMatGrayMask = new Mat(width, width, CvType.CV_8U);
             processingMatColor = new Mat(width, width, CvType.CV_8UC3);
+
             int yOffset = (width - height) / 2;
             roiRect = new Rect(0, yOffset, width, height);
             // Our state is OPENED
             state = CameraState.OPENED;
+
+
 
             // Tell Godot the camera is opened
             emitSignal("camera_opened");
@@ -440,7 +471,13 @@ public class SeekThermalGodotAndroidPlugin extends GodotPlugin
         // Make sure mask is completely black/white, no in-between
         Imgproc.threshold(mask320x320, mask320x320, 127, 255, Imgproc.THRESH_BINARY);
         Rect roiRect = new Rect(0, 40, width, height);
+
+        // The mask that is the size of the image is a submat of the square image
         mask320x240 = mask320x320.submat(roiRect);
+
+        // Get the inverted mask
+        mask320x240Inverse = new Mat();
+        Core.bitwise_not(mask320x240, mask320x240Inverse);
     }
 
     @NonNull
@@ -499,6 +536,26 @@ public class SeekThermalGodotAndroidPlugin extends GodotPlugin
         return (float)Math.sqrt(variance);
     }
 
+    public static float getPercentile(Mat image, float percentile) {
+
+        // Flatten to a single row
+        Mat reshaped = image.reshape(1, 1); // 1 channel, 1 row
+        Mat sorted = new Mat();
+        Core.sort(reshaped, sorted, Core.SORT_ASCENDING);
+
+        // Index for percentile (0 = min, 100 = max)
+        float index = (percentile / 100.0f) * (totalPixels - 1);
+
+        int lowerIdx = (int) Math.floor(index);
+        int upperIdx = (int) Math.ceil(index);
+
+        float lowerVal = (float)sorted.get(0, lowerIdx)[0];
+        float upperVal = (float)sorted.get(0, upperIdx)[0];
+
+        // Linear interpolation for smoother percentiles
+        float fraction = index - lowerIdx;
+        return lowerVal + (upperVal - lowerVal) * fraction;
+    }
 
     @Override
     public void onImageAvailable(final SeekImage seekImage) {
@@ -553,10 +610,10 @@ public class SeekThermalGodotAndroidPlugin extends GodotPlugin
             Core.flip(floatMat, floatMat, 0);
         }
 
-        // Blur the float data a little
-        Imgproc.medianBlur(floatMat, floatMat, 3);
+        // Blur the float data a little (or maybe not)
+        //Imgproc.medianBlur(floatMat, floatMat, 3);
 
-        // Get the min/max locations and values to find the min
+        // Get the min/max locations and values to find the min (within mask320x240)
         MinMaxLocResult res = Core.minMaxLoc(floatMat, mask320x240);
         //float avg = (float) Core.mean(floatMat, mask320x240).val[0];
 
@@ -571,8 +628,8 @@ public class SeekThermalGodotAndroidPlugin extends GodotPlugin
         //stats.put("avg", avg);
         //stats.put("stdDev", std);
 
-        Log.d(getPluginName(), "Processing image...");
-        scaled = scaleImage(floatMat, (float)res.minVal, maxTemp);
+        /*Log.d(getPluginName(), "Processing image...");
+        scaled = scaleImage(floatMat, (float)res.minVal, maxTemp, mask320x240);
         scaled.get(0, 0, scaledBytes);
         //scaled.copyTo(roi);
         scaled.copyTo(processingMatGray.submat(roiRect));
@@ -583,7 +640,7 @@ public class SeekThermalGodotAndroidPlugin extends GodotPlugin
 
         // Convert to color
         Imgproc.cvtColor(processingMatGrayMask, processingMatColor, Imgproc.COLOR_GRAY2BGR);
-        Utils.matToBitmap(processingMatColor, processingBitmap);
+        Utils.matToBitmap(processingMatColor, processingBitmap);*/
 
         // If we're exhaling, classify the image to see if we're still exhaling, and what type of exhale
         // Turning this off for now, I think we can do it statistically
@@ -599,8 +656,89 @@ public class SeekThermalGodotAndroidPlugin extends GodotPlugin
         // Subtract the min value from the data (within mask)
         Core.subtract(floatMat, new Scalar(res.minVal), floatMat, mask320x240);
 
+        // Scale the image between 0 and 10, which is the approximate range of the image after subtracting
+        scaled = scaleImage(floatMat, 0, 10, mask320x240);
+
+        // Make sure the pixels of scaled that are masked are black
+        scaled.setTo(blackColor, mask320x240Inverse);
+
+        /* CNN classification */
+
+        // Copy to a square image
+        scaled.copyTo(processingMatGray.submat(roiRect));
+
+        // Mask the data
+        processingMatGray.copyTo(processingMatGrayMask, mask320x320);
+        processingMatGrayMask.get(0, 0, scaledSquareBytes);
+
+        // Convert to color
+        Imgproc.cvtColor(processingMatGrayMask, processingMatColor, Imgproc.COLOR_GRAY2BGR);
+
+        // Convert the mat to a bitmap
+        Utils.matToBitmap(processingMatColor, processingBitmap);
+
+        // Once we have processingBitmap, we can classify the image
+        //classifyImage(processingBitmap);
+
+        /* Statistical classification */
+
+        // Initialize the moving average with the current image
+        if (!initialized) {
+            floatMat.copyTo(movingAverageMat, mask320x240);
+            initialized = true;
+        }
+        else {
+
+            // Subtract the moving average from the float data to get the difference image
+            Core.subtract(floatMat, movingAverageMat, diffMat);
+
+            // Get the min/max values and locations of diffMat, masked
+            MinMaxLocResult diffRes = Core.minMaxLoc(diffMat, mask320x240);
+
+            // Calculate the midrange of the data
+            float midrange = (float)(diffRes.maxVal + diffRes.minVal)/2.0f;
+
+            // Calculate a histogram of the data
+            float q1 = getPercentile(floatMat, 25);
+            float q3 = getPercentile(floatMat, 75);
+            float iqr = q3 - q1;
+            float iqrUpper = q3 + (1.5f*iqr);
+
+
+            if (classify) {
+
+                // Are we exhaling or not?
+
+                // When we're not exhaling, check for the start of the exhale
+                if (!exhaling && midrange > 0.5f) {
+                    exhaling = true;
+                }
+
+                // When we're exhaling, check for the end of the exhale
+                else if (exhaling && midrange < 0.0f) {
+                    exhaling = false;
+                    exhaleType = ExhaleType.NONE;
+                }
+
+                // If we're exhaling, classify the exhale using statistical method
+                if (exhaling && exhaleType == ExhaleType.NONE) {
+                    float iqrMaxDiff = iqrUpper - midrange;
+                    if (iqrMaxDiff < 0.0) {
+                        exhaleType = ExhaleType.GALE;
+                    }
+                    else if (iqrMaxDiff > 2.0) {
+                        exhaleType = ExhaleType.WAFT;
+                    }
+                }
+            }
+        }
+
+        // At the end, add to the moving average with a very small alpha
+        Imgproc.accumulateWeighted(floatMat, movingAverageMat, 0.01, mask320x240);
+
+        // old algorithm
         // Get the average values
-        MatOfDouble mean = new MatOfDouble();
+        /*MatOfDouble mean = new MatOfDouble();
         MatOfDouble stddev = new MatOfDouble();
         Core.meanStdDev(floatMat, mean, stddev, mask320x240);
 
@@ -665,12 +803,13 @@ public class SeekThermalGodotAndroidPlugin extends GodotPlugin
                 emitSignal("exhaling_changed", false, "");
             }
         }
-        prevMax = max;
+        prevMax = max;*/
     }
 
     /// Scales image between MIN_TEMP and MAX_TEMP, sets to CV_8U
-    private Mat scaleImage(Mat image, float _minTemp, float _maxTemp) {
+    private Mat scaleImage(Mat image, float _minTemp, float _maxTemp, Mat mask) {
 
+        // Create a results array, copy the image to it
         Mat result = new Mat();
         image.copyTo(result);
 
@@ -680,8 +819,8 @@ public class SeekThermalGodotAndroidPlugin extends GodotPlugin
         // Clip data above maxTemp
         Core.min(result, new Scalar(_maxTemp), result);
 
-        // Subtract min value from image
-        Core.subtract(result, new Scalar(_minTemp), result);
+        // Subtract min value from image (within the mask)
+        Core.subtract(result, new Scalar(_minTemp), result, mask);
 
         // Scale to [0,255] and convert to 8-bit unsigned integers
         result.convertTo(result, CvType.CV_8U, 255.0/(_maxTemp - _minTemp));
@@ -690,8 +829,9 @@ public class SeekThermalGodotAndroidPlugin extends GodotPlugin
     }
 
     /// Classifies the image
-    private void classifyImage() {
-        imageClassifierHelper.classify(processingBitmap, 0);
+    private void classifyImage(Bitmap image) {
+        //imageClassifierHelper.classify(processingBitmap, 0);
+        imageClassifierHelper.classify(image, 0);
     }
 
     @Override
@@ -716,7 +856,15 @@ public class SeekThermalGodotAndroidPlugin extends GodotPlugin
             return;
         }
 
+        // Get the categories
         Category c = classifications.get(0);
         emitSignal("new_class", c.getLabel(), c.getDisplayName(), c.getScore(), c.getIndex());
+
+        if (c.getLabel().equals("None") && c.getScore() > 0.5f) {
+            if (exhaling && exhaleType != ExhaleType.NONE) {
+                exhaling = false;
+                exhaleType = ExhaleType.NONE;
+            }
+        }
     }
 }
