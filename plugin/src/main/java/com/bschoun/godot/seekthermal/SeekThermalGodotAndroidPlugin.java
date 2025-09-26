@@ -25,18 +25,22 @@ import org.opencv.core.CvType;
 import org.opencv.core.Mat;
 import org.opencv.core.Core.MinMaxLocResult;
 import org.opencv.core.Core;
+import org.opencv.core.MatOfDouble;
 import org.opencv.core.Scalar;
 import org.opencv.core.Rect;
 
 // Tensorflow
+import org.opencv.core.Size;
 import org.opencv.imgproc.Imgproc;
-import org.tensorflow.lite.task.vision.classifier.Classifications;
-import org.tensorflow.lite.support.label.Category;
+//import org.tensorflow.lite.task.vision.classifier.Classifications;
+//import org.tensorflow.lite.support.label.Category;
 
 // Java
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
+//import java.util.Collections;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
@@ -51,7 +55,7 @@ import android.util.Log;
 import androidx.annotation.NonNull;
 
 public class SeekThermalGodotAndroidPlugin extends GodotPlugin
-        implements SeekImageReader.OnImageAvailableListener, ImageClassifierHelper.ClassifierListener {
+        implements SeekImageReader.OnImageAvailableListener {//, ImageClassifierHelper.ClassifierListener {
 
     private final SeekCameraManager seekCameraManager;
     private final SeekImageReader seekImageReader;        // Access to images without rendering
@@ -74,8 +78,10 @@ public class SeekThermalGodotAndroidPlugin extends GodotPlugin
 
     private final int FPS = 27;
 
+    private Size targetSize;
+
     private final int LONG_HISTORY = 6;
-    private final int SHORT_HISTORY = 1;
+    //private final int SHORT_HISTORY = 1;
 
     private final float STD_DEV = 2;
     private String cameraInfoText;
@@ -83,6 +89,12 @@ public class SeekThermalGodotAndroidPlugin extends GodotPlugin
     private Mat processingMatGray;
 
     private Mat processingMatGrayMask;
+
+    private Mat processingMatGrayMaskSmall;
+
+    private Mat processingMatGrayMaskSmallF;
+
+    private Mat processingMatGrayMaskSmallF3;
 
     private Mat processingMatColor;
     private Mat shortMat; // Intermediate data in 16-bit shorts
@@ -104,12 +116,14 @@ public class SeekThermalGodotAndroidPlugin extends GodotPlugin
 
     private byte[] scaledBytes;
 
+    private float[] floatData;
+
     private byte[] scaledSquareBytes;
     private short[] shortArray;
 
-    private List<Float> maxHistoryLong = new ArrayList<>();
-    private List<Float> avgHistoryShort = new ArrayList<>();
-    private List<Float> stdHistoryShort = new ArrayList<>();
+    //private List<Float> maxHistoryLong = new ArrayList<>();
+    //private List<Float> avgHistoryShort = new ArrayList<>();
+    //private List<Float> stdHistoryShort = new ArrayList<>();
 
 
     // List of color palettes that can be indexed (because you can't cast Java enums to ints?)
@@ -147,6 +161,7 @@ public class SeekThermalGodotAndroidPlugin extends GodotPlugin
         NONE,
         GALE,
         WAFT,
+        OTHER
     }
 
     //private float minTemp = 20.0f;
@@ -157,8 +172,8 @@ public class SeekThermalGodotAndroidPlugin extends GodotPlugin
     // Initialize to color 0
     private SeekCamera.ColorPalette _palette = colorPallets[0];
 
-    private final ImageClassifierHelper imageClassifierHelper;
-    private List<Category> classifications;
+    //private final ImageClassifierHelper imageClassifierHelper;
+    //private List<Category> classifications;
 
     // Keep track of whether we're exhaling or not (inhaling, holding breath)
     private boolean exhaling = false;
@@ -168,9 +183,10 @@ public class SeekThermalGodotAndroidPlugin extends GodotPlugin
     private static final int nFrames = 27;
 
     private long exhaleStartTime = 0;
+    private long exhaleEndTime = 0;
 
-    private float exhaleEndThreshold = 0;
-    private float prevMax = 0;
+    //private float exhaleEndThreshold = 0;
+    //private float prevMax = 0;
 
     private boolean initialized = false;
 
@@ -191,6 +207,7 @@ public class SeekThermalGodotAndroidPlugin extends GodotPlugin
     SeekCamera.StateCallback stateCallback = new SeekCamera.StateCallbackAdapter() {
         @Override
         public synchronized void onOpened(SeekCamera sc) {
+
             Log.d(getPluginName(), "Camera opened");
             seekCamera = sc;
 
@@ -200,6 +217,9 @@ public class SeekThermalGodotAndroidPlugin extends GodotPlugin
             height = seekCamera.getCharacteristics().getHeight();
 
             totalPixels = width*height;
+            targetSize = new Size(224, 224);
+
+            Log.d(getPluginName(), "Setting up mats...");
 
             // Initialize all of our data storage
             shortArray = new short[totalPixels];
@@ -210,17 +230,23 @@ public class SeekThermalGodotAndroidPlugin extends GodotPlugin
             scaled = new Mat(height, width, CvType.CV_8U);
             scaledBytes = new byte[totalPixels];
             scaledSquareBytes = new byte[width * width];
-            processingBitmap = Bitmap.createBitmap(width, width, Bitmap.Config.ARGB_8888);
+            floatData = new float[224*224*3];
+            processingBitmap = Bitmap.createBitmap(224, 224, Bitmap.Config.ARGB_8888);
             processingMatGray = new Mat(width, width, CvType.CV_8U);
             processingMatGrayMask = new Mat(width, width, CvType.CV_8U);
-            processingMatColor = new Mat(width, width, CvType.CV_8UC3);
+            processingMatGrayMaskSmall = new Mat(targetSize, CvType.CV_8U);
+            processingMatGrayMaskSmallF = new Mat(targetSize, CvType.CV_32F);
+            processingMatGrayMaskSmallF3 = new Mat(targetSize, CvType.CV_32FC3);
+            processingMatColor = new Mat(targetSize, CvType.CV_8UC3);
+
+            Log.d(getPluginName(), "Mats set up!");
 
             int yOffset = (width - height) / 2;
             roiRect = new Rect(0, yOffset, width, height);
             // Our state is OPENED
             state = CameraState.OPENED;
 
-
+            Log.d(getPluginName(), "Emitting camera_opened");
 
             // Tell Godot the camera is opened
             emitSignal("camera_opened");
@@ -387,49 +413,6 @@ public class SeekThermalGodotAndroidPlugin extends GodotPlugin
     }
     //endregion
 
-    //region Tensorflow Godot controls
-
-    @UsedByGodot
-    public float getTensorflowThreshold() {
-        return imageClassifierHelper.getThreshold();
-    }
-
-    @UsedByGodot
-    public void setTensorflowThreshold(float threshold) {
-        if (threshold < 0 || threshold > 1) {
-            Log.e(getPluginName(), "Invalid threshold value");
-            return;
-        }
-        imageClassifierHelper.setThreshold(threshold);
-    }
-
-    @UsedByGodot
-    public int getNumTensorflowThreads() {
-        return imageClassifierHelper.getNumThreads();
-    }
-
-    @UsedByGodot
-    public void setNumTensorflowThreads(int nThreads) {
-        imageClassifierHelper.setNumThreads(nThreads);
-    }
-
-    @UsedByGodot
-    public int getTensorflowMaxResults() {
-        return imageClassifierHelper.getMaxResults();
-    }
-
-    @UsedByGodot
-    public void setTensorflowMaxResults(int maxResults) {
-        imageClassifierHelper.setMaxResults(maxResults);
-    }
-
-    @UsedByGodot
-    public void setTensorflowCurrentDelegate(int currentDelegate) {
-        imageClassifierHelper.setCurrentDelegate(currentDelegate);
-    }
-
-    //endregion
-
     public SeekThermalGodotAndroidPlugin(Godot godot) {
         super(godot);
 
@@ -443,7 +426,7 @@ public class SeekThermalGodotAndroidPlugin extends GodotPlugin
             Log.d(getPluginName(), "ERROR: Could not load OpenCV.");
         }
 
-        imageClassifierHelper = ImageClassifierHelper.create(getActivity(), this);
+        //imageClassifierHelper = ImageClassifierHelper.create(getActivity());//, this);
 
         // Seek thermal camera initialization
         Log.d(getPluginName(), "Initializing Seek Thermal camera...");
@@ -501,6 +484,7 @@ public class SeekThermalGodotAndroidPlugin extends GodotPlugin
         signals.add(new SignalInfo("new_data", float[].class));
         signals.add(new SignalInfo("new_class", String.class, String.class, Float.class, Integer.class));
         signals.add(new SignalInfo("exhaling_changed", Boolean.class, String.class));
+        signals.add(new SignalInfo("midrange", Float.class));
 
         return signals;
     }
@@ -536,25 +520,30 @@ public class SeekThermalGodotAndroidPlugin extends GodotPlugin
         return (float)Math.sqrt(variance);
     }
 
-    public static float getPercentile(Mat image, float percentile) {
+    public static float getIQRUpperFence(Mat image, Mat mask) {
 
-        // Flatten to a single row
-        Mat reshaped = image.reshape(1, 1); // 1 channel, 1 row
-        Mat sorted = new Mat();
-        Core.sort(reshaped, sorted, Core.SORT_ASCENDING);
+        List<Float> pixelValues = new ArrayList<>();
+        for (int i = 0; i < image.rows(); i++) {
+            for (int j = 0; j < image.cols(); j++) {
+                double[] data = image.get(i, j);
+                if (mask.get(i,j)[0] > 0.0) {
+                    pixelValues.add((float)data[0]);
+                }
+            }
+        }
+        Collections.sort(pixelValues);
+        int size = pixelValues.size();
+        float q1, q3;
 
-        // Index for percentile (0 = min, 100 = max)
-        float index = (percentile / 100.0f) * (totalPixels - 1);
+        // Calculate Q1
+        int q1Index = (int) Math.round(0.25 * (size + 1)) - 1; // 1-based index to 0-based
+        q1 = pixelValues.get(q1Index);
 
-        int lowerIdx = (int) Math.floor(index);
-        int upperIdx = (int) Math.ceil(index);
-
-        float lowerVal = (float)sorted.get(0, lowerIdx)[0];
-        float upperVal = (float)sorted.get(0, upperIdx)[0];
-
-        // Linear interpolation for smoother percentiles
-        float fraction = index - lowerIdx;
-        return lowerVal + (upperVal - lowerVal) * fraction;
+        // Calculate Q3
+        int q3Index = (int) Math.round(0.75 * (size + 1)) - 1; // 1-based index to 0-based
+        q3 = pixelValues.get(q3Index);
+        float iqr = q3 - q1;
+        return q3 + (1.5f*iqr);
     }
 
     @Override
@@ -669,16 +658,30 @@ public class SeekThermalGodotAndroidPlugin extends GodotPlugin
 
         // Mask the data
         processingMatGray.copyTo(processingMatGrayMask, mask320x320);
+
+        // Copy the bytes to scaledSquareBytes to send to Godot
         processingMatGrayMask.get(0, 0, scaledSquareBytes);
 
+        // Scale image to 224x224 for CNN purposes
+        Imgproc.resize(processingMatGrayMask, processingMatGrayMaskSmall, targetSize, 0, 0, Imgproc.INTER_AREA);
+
+        // Converts to float and scales values between [-1,1]
+        processingMatGrayMaskSmall.convertTo(processingMatGrayMaskSmallF, CvType.CV_32F, (1/127.5f), -1);
+
+        List<Mat> channelList = Arrays.asList(processingMatGrayMaskSmallF, processingMatGrayMaskSmallF, processingMatGrayMaskSmallF);
+        Core.merge(channelList, processingMatGrayMaskSmallF3);
+
+        // Store the data in a float array
+        processingMatGrayMaskSmallF3.get(0, 0, floatData);
+
         // Convert to color
-        Imgproc.cvtColor(processingMatGrayMask, processingMatColor, Imgproc.COLOR_GRAY2BGR);
+        Imgproc.cvtColor(processingMatGrayMaskSmall, processingMatColor, Imgproc.COLOR_GRAY2BGR);
 
         // Convert the mat to a bitmap
         Utils.matToBitmap(processingMatColor, processingBitmap);
 
         // Once we have processingBitmap, we can classify the image
-        //classifyImage(processingBitmap);
+        //classifyImage(floatData);
 
         /* Statistical classification */
 
@@ -699,46 +702,68 @@ public class SeekThermalGodotAndroidPlugin extends GodotPlugin
             float midrange = (float)(diffRes.maxVal + diffRes.minVal)/2.0f;
 
             // Calculate a histogram of the data
-            float q1 = getPercentile(floatMat, 25);
-            float q3 = getPercentile(floatMat, 75);
-            float iqr = q3 - q1;
-            float iqrUpper = q3 + (1.5f*iqr);
+            float iqrUpperFence = getIQRUpperFence(diffMat, mask320x240);
 
+            // We should classify by default, but let's make sure enough time has elapsed since the end of the previous exhale
+            classify = true;
 
-            if (classify) {
-
-                // Are we exhaling or not?
-
-                // When we're not exhaling, check for the start of the exhale
-                if (!exhaling && midrange > 0.5f) {
-                    exhaling = true;
+            // We'll do debounce logic later
+            // Check whether enough time has elapsed since the last exhale
+            /*if (!exhaling) {
+                if ((System.nanoTime() - exhaleEndTime)/1_000_000_000.0f < debounce) {
+                    classify = false;
                 }
+            }*/
 
-                // When we're exhaling, check for the end of the exhale
-                else if (exhaling && midrange < 0.0f) {
-                    exhaling = false;
-                    exhaleType = ExhaleType.NONE;
+
+            //if (classify) {
+
+            // Are we exhaling or not?
+            emitSignal("midrange", midrange);
+
+            // When we're not exhaling, check for the start of the exhale
+            if (!exhaling) {
+                if (midrange > 0.5f) {
+                    startExhale();
                 }
+            }
 
-                // If we're exhaling, classify the exhale using statistical method
-                if (exhaling && exhaleType == ExhaleType.NONE) {
-                    float iqrMaxDiff = iqrUpper - midrange;
-                    if (iqrMaxDiff < 0.0) {
-                        exhaleType = ExhaleType.GALE;
-                    }
-                    else if (iqrMaxDiff > 2.0) {
-                        exhaleType = ExhaleType.WAFT;
-                    }
+            // When we're exhaling, check for the end of the exhale
+            else {
+                if (midrange < 0.0f) {
+                    endExhale();
+                }
+                // Check for timeout (six seconds or longer exhale)
+                else if ((System.nanoTime() - exhaleStartTime)/1_000_000_000.0f > LONG_HISTORY) {
+                    endExhale();
+                }
+            }
+
+            // If we're exhaling and haven't yet classified the exhale, classify it
+            if (exhaling && exhaleType == ExhaleType.NONE) {
+
+                float iqrMaxDiff = iqrUpperFence - midrange;
+                Log.d(getPluginName(), "Midrange: " + Float.toString(midrange) + " iqrMaxDiff: " + Float.toString(iqrMaxDiff));
+                if (iqrMaxDiff < 0.0) {
+                    exhaleType = ExhaleType.GALE;
+                    emitSignal("exhaling_changed", true, "GALE");
+                }
+                else if (iqrMaxDiff > 2.0) {
+                    exhaleType = ExhaleType.WAFT;
+                    emitSignal("exhaling_changed", true, "WAFT");
+                }
+                else {
+                    exhaleType = ExhaleType.OTHER;
                 }
             }
         }
 
         // At the end, add to the moving average with a very small alpha
-        Imgproc.accumulateWeighted(floatMat, movingAverageMat, 0.01, mask320x240);
+        /*Imgproc.accumulateWeighted(floatMat, movingAverageMat, 0.01, mask320x240);
 
         // old algorithm
         // Get the average values
-        /*MatOfDouble mean = new MatOfDouble();
+        MatOfDouble mean = new MatOfDouble();
         MatOfDouble stddev = new MatOfDouble();
         Core.meanStdDev(floatMat, mean, stddev, mask320x240);
 
@@ -806,6 +831,20 @@ public class SeekThermalGodotAndroidPlugin extends GodotPlugin
         prevMax = max;*/
     }
 
+    private void endExhale() {
+        exhaling = false;
+        exhaleEndTime = System.nanoTime();
+        exhaleType = ExhaleType.NONE;
+        emitSignal("exhaling_changed", false, "");
+    }
+
+    private void startExhale() {
+        exhaling = true;
+        exhaleStartTime = System.nanoTime();
+        // This will be triggered after classification
+        //emitSignal("exhaling_changed", true, "");
+    }
+
     /// Scales image between MIN_TEMP and MAX_TEMP, sets to CV_8U
     private Mat scaleImage(Mat image, float _minTemp, float _maxTemp, Mat mask) {
 
@@ -828,19 +867,23 @@ public class SeekThermalGodotAndroidPlugin extends GodotPlugin
         return result;
     }
 
+    /*private void classifyImage(float[] floatData) {
+        imageClassifierHelper.classify(floatData, 0);
+    }*/
+
     /// Classifies the image
-    private void classifyImage(Bitmap image) {
+    /*private void classifyImage(Bitmap image) {
         //imageClassifierHelper.classify(processingBitmap, 0);
         imageClassifierHelper.classify(image, 0);
-    }
+    }*/
 
-    @Override
+    /*@Override
     public void onError(String error) {
         Log.e(getPluginName(), error);
         classifications = new ArrayList<>();
-    }
+    }*/
 
-    @Override
+    /*@Override
     public void onResults(List<Classifications> results, long inferenceTime) {
         // This will generally return 1 or 0 results, because we're thresholding at 0.5. I suppose
         // it's possible it could return 2 if each is exactly .5, but this is highly unlikely
@@ -849,10 +892,6 @@ public class SeekThermalGodotAndroidPlugin extends GodotPlugin
         // Sometimes we don't get a category, meaning nothing reached the threshold. If this happens, and we're exhaling,
         // we say that we're no longer exhaling I guess
         if (classifications.isEmpty()) {
-            /*if (exhaling) {
-                emitSignal("exhaling_changed", false);
-                exhaling = false;
-            }*/
             return;
         }
 
@@ -866,5 +905,5 @@ public class SeekThermalGodotAndroidPlugin extends GodotPlugin
                 exhaleType = ExhaleType.NONE;
             }
         }
-    }
+    }*/
 }

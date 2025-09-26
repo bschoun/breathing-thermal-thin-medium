@@ -1,5 +1,14 @@
-# Godot Android Plugin Template
-This repository serves as a quickstart template for building a Godot Android plugin for Godot 4.2+.
+# Breathing Lab: Breath-Controlled Virtual Reality using Thermal Thin-Medium Imaging
+
+This Godot project is a demonstration of a custom breathing sensor for VR that uses thermal imaging and a thin medium to detect exhale gestures. It is the sample application described in the paper "Breath-Controlled Virtual Reality using Thermal Thin-Medium Imaging" by Schoun et. al. 
+
+This demonstration currently showcases how to use exhale gestures to navigate through a virtual environment. In the future, we plan to add demonstrations showing interactions with virtual objects and dynamically changing a virtual environment based on breathing rate.
+
+NOTE: Using this project in the intended manner requires 3D printing your own sensor apparatus, as well as purchasing a Seek Thermal development kit. 
+
+## Building the sensor
+
+## Usage
 
 ## Contents
 * An illustrative simple Godot project: [`plugin/demo`](plugin/demo)

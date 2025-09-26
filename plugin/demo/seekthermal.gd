@@ -8,6 +8,7 @@ signal camera_connected(camera_info : String, width : int, height : int)
 signal camera_disconnected
 signal camera_started
 signal camera_stopped
+signal midrange(value : float)
 signal new_image(image : PackedByteArray)
 #signal new_data(stats: Dictionary, data : PackedFloat32Array)
 signal new_data(data : PackedFloat32Array)
@@ -33,8 +34,12 @@ func _ready() -> void:
 		_android_plugin.connect("new_stats", _on_new_stats)
 		_android_plugin.connect("new_class", _on_new_class)
 		_android_plugin.connect("exhaling_changed", _on_exhaling_changed)
+		_android_plugin.connect("midrange", _on_midrange)
 	else:
 		printerr("Couldn't find plugin " + _plugin_name)
+		
+func _on_midrange(value : float):
+	midrange.emit(value)
 
 func _on_camera_opened() -> void:
 	print("camera connected")

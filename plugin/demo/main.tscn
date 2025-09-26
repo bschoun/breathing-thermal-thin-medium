@@ -8,7 +8,7 @@
 resource_local_to_scene = true
 font_color = Color(1, 0, 0, 1)
 
-[node name="Main" type="Node2D" node_paths=PackedStringArray("texture_rect", "status_label", "data_label", "stats_label", "start_stop_button", "classes_label", "exhaling_label")]
+[node name="Main" type="Node2D" node_paths=PackedStringArray("texture_rect", "status_label", "data_label", "stats_label", "start_stop_button", "classes_label", "exhaling_label", "midrange_label")]
 script = ExtResource("1_j0gfq")
 texture_rect = NodePath("TextureRect")
 status_label = NodePath("StatusLabel")
@@ -17,9 +17,9 @@ stats_label = NodePath("StatsLabel")
 start_stop_button = NodePath("StartStopButton")
 classes_label = NodePath("ClassesLabel")
 exhaling_label = NodePath("ExhalingLabel")
+midrange_label = NodePath("Midrange")
 
 [node name="StatusLabel" type="Label" parent="."]
-anchors_preset = -1
 offset_left = -1.0
 offset_top = 96.0
 offset_right = 1149.0
@@ -28,7 +28,6 @@ text = "Camera not connected"
 horizontal_alignment = 1
 
 [node name="DataLabel" type="Label" parent="."]
-anchors_preset = -1
 offset_left = 2.0
 offset_top = 218.0
 offset_right = 1152.0
@@ -37,7 +36,6 @@ text = "[Image data]"
 horizontal_alignment = 1
 
 [node name="StatsLabel" type="Label" parent="."]
-anchors_preset = -1
 offset_left = 2.0
 offset_top = 369.0
 offset_right = 1152.0
@@ -46,7 +44,6 @@ text = "[Stats]"
 horizontal_alignment = 1
 
 [node name="ClassesLabel" type="Label" parent="."]
-anchors_preset = -1
 offset_left = 4.0
 offset_top = 550.0
 offset_right = 1154.0
@@ -55,8 +52,16 @@ text = "[Classes]"
 label_settings = SubResource("LabelSettings_h2yge")
 horizontal_alignment = 1
 
+[node name="Midrange" type="Label" parent="."]
+offset_left = 5.0
+offset_top = 512.0
+offset_right = 1155.0
+offset_bottom = 611.0
+text = "[Midrange]"
+label_settings = SubResource("LabelSettings_h2yge")
+horizontal_alignment = 1
+
 [node name="ExhalingLabel" type="Label" parent="."]
-anchors_preset = -1
 offset_left = 4.0
 offset_top = 594.0
 offset_right = 1154.0
@@ -66,14 +71,12 @@ label_settings = SubResource("LabelSettings_0xm2m")
 horizontal_alignment = 1
 
 [node name="TextureRect" type="TextureRect" parent="."]
-anchors_preset = -1
 offset_left = 796.0
 offset_top = 196.0
 offset_right = 1116.0
 offset_bottom = 516.0
 
 [node name="StartStopButton" type="Button" parent="."]
-anchors_preset = -1
 offset_left = 68.0
 offset_top = 180.0
 offset_right = 404.0
@@ -83,7 +86,6 @@ toggle_mode = true
 text = "Start camera"
 
 [node name="OptionButton" type="OptionButton" parent="."]
-anchors_preset = -1
 offset_left = 71.0
 offset_top = 330.0
 offset_right = 401.0
@@ -128,7 +130,6 @@ popup/item_17/text = "USER4"
 popup/item_17/id = 17
 
 [node name="FlipXCheckButton" type="CheckButton" parent="."]
-anchors_preset = -1
 offset_left = 87.0
 offset_top = 429.0
 offset_right = 177.0
@@ -136,7 +137,6 @@ offset_bottom = 460.0
 text = "Flip X"
 
 [node name="FlipYCheckButton" type="CheckButton" parent="."]
-anchors_preset = -1
 offset_left = 88.0
 offset_top = 470.0
 offset_right = 178.0
@@ -144,7 +144,6 @@ offset_bottom = 501.0
 text = "Flip Y"
 
 [node name="ImageSmoothing" type="CheckButton" parent="."]
-anchors_preset = -1
 offset_left = 88.0
 offset_top = 516.0
 offset_right = 220.0
@@ -152,7 +151,6 @@ offset_bottom = 547.0
 text = "Smoothing"
 
 [node name="Shutter" type="CheckButton" parent="."]
-anchors_preset = -1
 offset_left = 87.0
 offset_top = 565.0
 offset_right = 219.0
