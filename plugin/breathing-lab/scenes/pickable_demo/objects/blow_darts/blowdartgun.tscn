@@ -1,0 +1,10 @@
+[gd_scene load_steps=3 format=3 uid="uid://byno77daoy0og"]
+
+[ext_resource type="PackedScene" uid="uid://4fnboayx2exe" path="res://scenes/pickable_demo/objects/blow_darts/blowdartgun.fbx" id="1_ahet4"]
+[ext_resource type="Material" uid="uid://ubparwd5vxjg" path="res://scenes/pickable_demo/objects/hot_air_balloon/materials/hotairballoon_basket.tres" id="2_tccgi"]
+
+[node name="blowdartgun" instance=ExtResource("1_ahet4")]
+
+[node name="Cylinder_001" parent="." index="0"]
+transform = Transform3D(-3.2584137e-07, 2, 0, -2, -3.2584137e-07, 0, 0, 0, 2, 0, 0, 0)
+material_override = ExtResource("2_tccgi")

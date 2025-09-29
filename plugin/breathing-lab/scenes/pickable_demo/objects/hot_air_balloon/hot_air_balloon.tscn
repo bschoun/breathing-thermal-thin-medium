@@ -1,0 +1,69 @@
+[gd_scene load_steps=8 format=3 uid="uid://cy5pq00h5wmgg"]
+
+[ext_resource type="PackedScene" uid="uid://bqawvwu34vunp" path="res://scenes/pickable_demo/objects/hot_air_balloon/hotairballoon_baskets.fbx" id="1_yq0c4"]
+[ext_resource type="PackedScene" uid="uid://db7bos5nhh8jk" path="res://scenes/pickable_demo/objects/hot_air_balloon/hotairballoon_burners.fbx" id="2_dilyi"]
+[ext_resource type="Material" uid="uid://ubparwd5vxjg" path="res://scenes/pickable_demo/objects/hot_air_balloon/materials/hotairballoon_basket.tres" id="2_olr4x"]
+[ext_resource type="Material" uid="uid://sycm2klu6io6" path="res://scenes/pickable_demo/objects/hot_air_balloon/materials/hotairballoon_silver.tres" id="3_olr4x"]
+[ext_resource type="PackedScene" uid="uid://dseva6xyfhjij" path="res://scenes/pickable_demo/objects/hot_air_balloon/hotairballoon_envelopes.fbx" id="3_ow55h"]
+[ext_resource type="Material" uid="uid://dhjg8waxaykc8" path="res://scenes/pickable_demo/objects/hot_air_balloon/materials/hotairballoon1_envelope.tres" id="5_gffsr"]
+[ext_resource type="Material" uid="uid://brc7rjam836cb" path="res://scenes/pickable_demo/objects/hot_air_balloon/materials/hotairballoon2_envelope.tres" id="7_gffsr"]
+
+[node name="HotAirBalloon" type="Node3D"]
+
+[node name="hotairballoon_baskets" parent="." instance=ExtResource("1_yq0c4")]
+
+[node name="V1_HotAirBalloon_Basket_1" parent="hotairballoon_baskets" index="0"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -1.482, 0)
+visible = false
+material_override = ExtResource("2_olr4x")
+
+[node name="V1_HotAirBalloon_Cables_1" parent="hotairballoon_baskets" index="1"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -1.482, 0)
+visible = false
+
+[node name="V1_HotAirBalloon_Basket_2" parent="hotairballoon_baskets" index="2"]
+visible = false
+material_override = ExtResource("2_olr4x")
+
+[node name="V1_HotAirBalloon_Cables_2" parent="hotairballoon_baskets" index="3"]
+visible = false
+
+[node name="V1_HotAirBalloon_Basket_3" parent="hotairballoon_baskets" index="4"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -1.4824218, 0)
+material_override = ExtResource("2_olr4x")
+
+[node name="V1_HotAirBalloon_Cables_3" parent="hotairballoon_baskets" index="5"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -1.4824215, 0)
+
+[node name="hotairballoon_burners" parent="." instance=ExtResource("2_dilyi")]
+
+[node name="V1_HotAirBalloon_Burners_1" parent="hotairballoon_burners" index="0"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -1.4449216, 0)
+visible = false
+material_override = ExtResource("3_olr4x")
+
+[node name="V1_HotAirBalloon_Burners_2" parent="hotairballoon_burners" index="1"]
+visible = false
+material_override = ExtResource("3_olr4x")
+
+[node name="V1_HotAirBalloon_Burners_3" parent="hotairballoon_burners" index="2"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -1.4449216, 0)
+material_override = ExtResource("3_olr4x")
+
+[node name="hotairballoon_envelopes" parent="." instance=ExtResource("3_ow55h")]
+
+[node name="V1_HotAirBalloon_Envelope_1" parent="hotairballoon_envelopes" index="0"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
+visible = false
+material_override = ExtResource("5_gffsr")
+
+[node name="V1_HotAirBalloon_Envelope_2" parent="hotairballoon_envelopes" index="1"]
+material_override = ExtResource("7_gffsr")
+
+[node name="V1_HotAirBalloon_Envelope_3" parent="hotairballoon_envelopes" index="2"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
+visible = false
+
+[editable path="hotairballoon_baskets"]
+[editable path="hotairballoon_burners"]
+[editable path="hotairballoon_envelopes"]

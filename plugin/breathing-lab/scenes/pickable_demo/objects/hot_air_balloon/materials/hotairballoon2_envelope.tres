@@ -1,0 +1,6 @@
+[gd_resource type="StandardMaterial3D" load_steps=2 format=3 uid="uid://brc7rjam836cb"]
+
+[ext_resource type="Texture2D" uid="uid://c3cormxap5v6g" path="res://scenes/pickable_demo/objects/hot_air_balloon/materials/V1_HotAirBalloon_Livery_6.png" id="1_jsf2n"]
+
+[resource]
+albedo_texture = ExtResource("1_jsf2n")

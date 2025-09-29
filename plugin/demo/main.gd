@@ -5,9 +5,8 @@ extends Node2D
 @export var data_label : Label
 @export var stats_label : Label
 @export var start_stop_button : Button
-@export var classes_label : Label
 @export var exhaling_label : Label
-@export var midrange_label : Label
+
 
 var w: int
 var h: int
@@ -23,10 +22,6 @@ func _ready():
 	SeekThermal.exhaling_changed.connect(_on_seek_thermal_exhaling_changed)
 	SeekThermal.new_image.connect(_on_seek_thermal_new_image)
 	SeekThermal.new_stats.connect(_on_seek_thermal_new_stats)
-	SeekThermal.midrange.connect(_on_midrange)
-	
-func _on_midrange(value : float):
-	midrange_label.text = str(value)
 	
 
 func _on_seek_thermal_camera_opened(camera_info : String, width : int, height : int) -> void:
@@ -98,22 +93,29 @@ func _on_shutter_toggled(toggled_on: bool) -> void:
 
 func _on_seek_thermal_new_image(image: PackedByteArray) -> void:
 	#img = Image.create_from_data(w, h, false, Image.FORMAT_RGBA8, image)
-	img = Image.create_from_data(w, w, false, Image.FORMAT_L8, image)
+	var s = sqrt(image.size())
+	img = Image.create_from_data(s, s, false, Image.FORMAT_L8, image)
+	if texture_rect.size.x != int(s):
+		texture_rect.size.x = s
+		texture_rect.size.y = s
 	texture_rect.texture = ImageTexture.create_from_image(img)
 
 
 func _on_seek_thermal_new_stats(stats: Dictionary) -> void:
 	stats_label.text = "Min: (" + str(stats["minX"]) + "," + str(stats["minY"]) + "): %0.2f" % stats["minValue"] + " C\n"
 	stats_label.text += "Max: (" + str(stats["maxX"]) + "," + str(stats["maxY"]) + "): %0.2f" % stats["maxValue"] + " C\n"
-	#stats_label.text += "Average: %0.2f" % stats["avg"] + " C\n";
+	#stats_label.text += "Diff midrange: %0.2f" % stats["diffMidrangeValue"] + "\n";
+	#stats_label.text += "Diff max: %0.2f" % stats["diffMaxValue"]
+	
 
 
 func _on_seek_thermal_exhaling_changed(value: bool, exhale_type : String) -> void:
+	
+	if value and exhale_type == "NONE":
+		exhaling_label.text = "EXHALING"
+	else:
+		exhaling_label.text = exhale_type
 	if value:
-		exhaling_label.text = "EXHALING " + exhale_type
 		exhaling_label.label_settings.font_color = Color(0.0, 1.0, 0.0, 1.0)
 	else:
-		exhaling_label.text = "NOT EXHALING"
 		exhaling_label.label_settings.font_color = Color(1.0, 0.0, 0.0, 1.0)
-		classes_label.text = ""
-		classes_label.label_settings.font_color = Color(1.0, 1.0, 1.0, 1.0)

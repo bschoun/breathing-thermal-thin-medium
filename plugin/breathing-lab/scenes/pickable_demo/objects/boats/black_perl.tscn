@@ -1,0 +1,10 @@
+[gd_scene load_steps=3 format=3 uid="uid://dc1t80qopfwea"]
+
+[ext_resource type="PackedScene" uid="uid://cdt4s2bs77o0w" path="res://scenes/pickable_demo/objects/boats/black_perl.fbx" id="1_a1ehh"]
+[ext_resource type="Material" uid="uid://8jajxeguh5pn" path="res://scenes/pickable_demo/objects/boats/boats_mat.tres" id="2_kfel7"]
+
+[node name="black_perl" instance=ExtResource("1_a1ehh")]
+transform = Transform3D(0.025, 0, 0, 0, 0.025, 0, 0, 0, 0.025, 0, 0, 0)
+
+[node name="polySurface7" parent="." index="0"]
+material_override = ExtResource("2_kfel7")

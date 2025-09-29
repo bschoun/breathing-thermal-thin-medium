@@ -1,0 +1,49 @@
+[gd_scene load_steps=5 format=3 uid="uid://d042fwl2ombm7"]
+
+[ext_resource type="Material" uid="uid://d11pwr25q2a2o" path="res://scenes/pickable_demo/objects/boats/pool.tres" id="1_i3rxm"]
+[ext_resource type="Material" uid="uid://clnn2w5fayivh" path="res://scenes/pickable_demo/objects/boats/water.tres" id="1_vjidx"]
+
+[sub_resource type="BoxMesh" id="BoxMesh_fesxa"]
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_vjidx"]
+size = Vector3(2.2, 0.9, 2.2)
+
+[node name="BoatPool" type="StaticBody3D"]
+
+[node name="Bottom" type="MeshInstance3D" parent="."]
+transform = Transform3D(2, 0, 0, 0, 0.4, 0, 0, 0, 2, 0, 0.2, 0)
+material_override = ExtResource("1_i3rxm")
+mesh = SubResource("BoxMesh_fesxa")
+
+[node name="Water" type="MeshInstance3D" parent="."]
+transform = Transform3D(2, 0, 0, 0, 0.4, 0, 0, 0, 2, 0, 0.6, 0)
+material_override = ExtResource("1_vjidx")
+mesh = SubResource("BoxMesh_fesxa")
+
+[node name="Wall1" type="MeshInstance3D" parent="."]
+transform = Transform3D(0.1, 0, 0, 0, 0.9, 0, 0, 0, 2, 1.05, 0.45, 0)
+material_override = ExtResource("1_i3rxm")
+mesh = SubResource("BoxMesh_fesxa")
+skeleton = NodePath("../Bottom")
+
+[node name="Wall2" type="MeshInstance3D" parent="."]
+transform = Transform3D(0.1, 0, 0, 0, 0.9, 0, 0, 0, 2, -1.05, 0.45, 0)
+material_override = ExtResource("1_i3rxm")
+mesh = SubResource("BoxMesh_fesxa")
+skeleton = NodePath("../Bottom")
+
+[node name="Wall3" type="MeshInstance3D" parent="."]
+transform = Transform3D(-4.371139e-09, 0, 2.2, 0, 0.9, 0, -0.1, 0, -9.616505e-08, 0, 0.45, -1.05)
+material_override = ExtResource("1_i3rxm")
+mesh = SubResource("BoxMesh_fesxa")
+skeleton = NodePath("../Bottom")
+
+[node name="Wall4" type="MeshInstance3D" parent="."]
+transform = Transform3D(-4.371139e-09, 0, 2.2, 0, 0.9, 0, -0.1, 0, -9.616505e-08, 0, 0.45, 1.05)
+material_override = ExtResource("1_i3rxm")
+mesh = SubResource("BoxMesh_fesxa")
+skeleton = NodePath("../Bottom")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.45, 0)
+shape = SubResource("BoxShape3D_vjidx")

@@ -1,0 +1,10 @@
+[gd_scene load_steps=3 format=3 uid="uid://fvwo3i037dh7"]
+
+[ext_resource type="PackedScene" uid="uid://dl7xt28aodaht" path="res://scenes/pickable_demo/objects/boats/white_fang.fbx" id="1_v3paj"]
+[ext_resource type="Material" uid="uid://8jajxeguh5pn" path="res://scenes/pickable_demo/objects/boats/boats_mat.tres" id="2_oelfd"]
+
+[node name="white_fang" instance=ExtResource("1_v3paj")]
+transform = Transform3D(0.025, 0, 0, 0, 0.025, 0, 0, 0, 0.025, 0, 0, 0)
+
+[node name="polySurface11" parent="." index="0"]
+material_override = ExtResource("2_oelfd")

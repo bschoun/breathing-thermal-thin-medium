@@ -1,0 +1,10 @@
+[gd_scene load_steps=3 format=3 uid="uid://ijol0tyiy0nq"]
+
+[ext_resource type="PackedScene" uid="uid://ckpc3yow7bg83" path="res://scenes/pickable_demo/objects/boats/speedy.fbx" id="1_4qo1y"]
+[ext_resource type="Material" uid="uid://8jajxeguh5pn" path="res://scenes/pickable_demo/objects/boats/boats_mat.tres" id="2_avrkx"]
+
+[node name="speedy" instance=ExtResource("1_4qo1y")]
+transform = Transform3D(0.05, 0, 0, 0, 0.05, 0, 0, 0, 0.05, 0, 0, 0)
+
+[node name="pCube13" parent="." index="0"]
+material_override = ExtResource("2_avrkx")

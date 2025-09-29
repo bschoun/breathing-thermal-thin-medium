@@ -12,222 +12,198 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
+ *
+ * Source: https://github.com/tensorflow/examples/blob/master/lite/examples/image_classification/android_java/app/src/main/java/org/tensorflow/lite/examples/imageclassification/ImageClassifierHelper.java
  */
 
 package com.bschoun.godot.seekthermal;
 
-import android.app.Activity;
 import android.content.Context;
-import android.content.res.AssetFileDescriptor;
 import android.graphics.Bitmap;
 import android.os.SystemClock;
 import android.util.Log;
 
-import java.io.FileInputStream;
+import org.tensorflow.lite.Delegate;
+import org.tensorflow.lite.Interpreter;
+import org.tensorflow.lite.gpu.GpuDelegate;
+import org.tensorflow.lite.nnapi.NnApiDelegate;
+import org.tensorflow.lite.support.common.FileUtil;
+import org.tensorflow.lite.support.common.ops.NormalizeOp;
+import org.tensorflow.lite.support.image.ImageProcessor;
+import org.tensorflow.lite.support.image.TensorImage;
+import org.tensorflow.lite.support.image.ops.Rot90Op;
+
 import java.io.IOException;
 import java.nio.MappedByteBuffer;
-import java.nio.channels.FileChannel;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 
-// Tensorflow
-import org.tensorflow.lite.support.image.TensorImage;
-import org.tensorflow.lite.Interpreter;
-//import org.tensorflow.lite.task.vision.classifier.Classifications;
-
-/** Helper class for wrapping Image Classification actions */
+/** Helper class for wrapping Image Classification actions with raw Interpreter */
 public class ImageClassifierHelper {
     private static final String TAG = "ImageClassifierHelper";
     private static final int DELEGATE_CPU = 0;
     private static final int DELEGATE_GPU = 1;
     private static final int DELEGATE_NNAPI = 2;
 
-    private float threshold;
-    private int numThreads;
-    private int maxResults;
-    //private int currentDelegate;
+    private final float threshold;
+    private final int numThreads;
+    private final int maxResults;
+    private final int currentDelegate;
     private final Context context;
-    //private final ClassifierListener imageClassifierListener;
-    //private ImageClassifier imageClassifier;
+    private final ClassifierListener listener;
 
-    protected Interpreter tflite;
+    private Interpreter interpreter;
+    private Delegate delegate;
+    private List<String> labels;
 
-    //String modelName = "converted_tflite_quantized/model.tflite";
-    String modelName = "converted_tflite/model_unquant.tflite";
+    // Paths inside assets
+    private String modelPath = "converted_tflite/model_unquant.tflite";
+    private String labelPath = "converted_tflite/labels.txt";
 
-    /** Helper class for wrapping Image Classification actions */
     public ImageClassifierHelper(Float threshold,
                                  int numThreads,
                                  int maxResults,
                                  int currentDelegate,
-                                 Context context) {
-                                 //ClassifierListener imageClassifierListener) {
+                                 Context context,
+                                 ClassifierListener listener) {
         this.threshold = threshold;
         this.numThreads = numThreads;
         this.maxResults = maxResults;
-        //this.currentDelegate = currentDelegate;
-        this.context = context;
-        //this.imageClassifierListener = imageClassifierListener;
-        setupImageClassifier();
-    }
-
-    public static ImageClassifierHelper create(
-            Context context//,
-            //ClassifierListener listener
-    ) {
-        return new ImageClassifierHelper(
-                0.5f,
-                2,
-                3,
-                0,
-                context//,
-                //listener
-        );
-    }
-
-    public float getThreshold() {
-        return threshold;
-    }
-
-    public void setThreshold(float threshold) {
-        this.threshold = threshold;
-    }
-
-    public int getNumThreads() {
-        return numThreads;
-    }
-
-    public void setNumThreads(int numThreads) {
-        this.numThreads = numThreads;
-    }
-
-    public int getMaxResults() {
-        return maxResults;
-    }
-
-    public void setMaxResults(int maxResults) {
-        this.maxResults = maxResults;
-    }
-
-    /*public void setCurrentDelegate(int currentDelegate) {
         this.currentDelegate = currentDelegate;
-    }*/
-
-    /** Memory-map the model file in Assets. */
-    private MappedByteBuffer loadModelFile() throws IOException {
-        AssetFileDescriptor fileDescriptor = this.context.getAssets().openFd(modelName);
-        FileInputStream inputStream = new FileInputStream(fileDescriptor.getFileDescriptor());
-        FileChannel fileChannel = inputStream.getChannel();
-        long startOffset = fileDescriptor.getStartOffset();
-        long declaredLength = fileDescriptor.getDeclaredLength();
-        return fileChannel.map(FileChannel.MapMode.READ_ONLY, startOffset, declaredLength);
+        this.context = context;
+        this.listener = listener;
+        setupInterpreter();
     }
 
-    private void setupImageClassifier() {
+    public static ImageClassifierHelper create(Context context, ClassifierListener listener) {
+        return new ImageClassifierHelper(0.5f, 2, 3, DELEGATE_CPU, context, listener);
+    }
 
-        /*ImageClassifier.ImageClassifierOptions.Builder optionsBuilder =
-                ImageClassifier.ImageClassifierOptions.builder()
-                        .setScoreThreshold(threshold)
-                        .setMaxResults(maxResults);
-
-        BaseOptions.Builder baseOptionsBuilder =
-                BaseOptions.builder().setNumThreads(numThreads);*/
-
+    /** Load model and configure interpreter */
+    private void setupInterpreter() {
         try {
-            tflite = new Interpreter(loadModelFile());
-        }
-        catch (IOException e) {
-            e.printStackTrace();
-        }
+            MappedByteBuffer modelBuffer = FileUtil.loadMappedFile(context, modelPath);
+            Interpreter.Options options = new Interpreter.Options();
+            options.setNumThreads(numThreads);
 
-        /*switch (currentDelegate) {
-            case DELEGATE_CPU:
-                // Default
-                break;
-            case DELEGATE_GPU:
-                if (new CompatibilityList().isDelegateSupportedOnThisDevice()) {
-                    baseOptionsBuilder.useGpu();
-                } else {
-                    imageClassifierListener.onError("GPU is not supported on "
-                            + "this device");
-                }
-                break;
-            case DELEGATE_NNAPI:
-                baseOptionsBuilder.useNnapi();
-        }*/
-        /*try {
-            imageClassifier =
-                    ImageClassifier.createFromFileAndOptions(
-                            context,
-                            modelName,
-                            optionsBuilder.build());
+            switch (currentDelegate) {
+                case DELEGATE_GPU:
+                    delegate = new GpuDelegate();
+                    options.addDelegate(delegate);
+                    break;
+                case DELEGATE_NNAPI:
+                    delegate = new NnApiDelegate();
+                    options.addDelegate(delegate);
+                    break;
+                case DELEGATE_CPU:
+                default:
+                    // no delegate
+            }
+
+            interpreter = new Interpreter(modelBuffer, options);
+            labels = FileUtil.loadLabels(context, labelPath);
+
         } catch (IOException e) {
-            imageClassifierListener.onError("Image classifier failed to "
-                    + "initialize. See error logs for details");
-            Log.e(TAG, "TFLite failed to load model with error: "
-                    + e.getMessage());
-        }*/
+            listener.onError("Failed to load TFLite model or labels: " + e.getMessage());
+            Log.e(TAG, "TFLite failed to load", e);
+        }
     }
 
-    /*public void classify(Bitmap image, int imageRotation) {
-        if (imageClassifier == null) {
-            setupImageClassifier();
+    /** Run classification */
+    public void classify(Bitmap bitmap, int imageRotation) {
+        if (interpreter == null) {
+            setupInterpreter();
+            if (interpreter == null) return;
         }
 
-        // Inference time is the difference between the system time at the start
-        // and finish of the process
-        long inferenceTime = SystemClock.uptimeMillis();
+        long startTime = SystemClock.uptimeMillis();
 
-        // Create preprocessor for the image.
-        // See https://www.tensorflow.org/lite/inference_with_metadata/
-        //            lite_support#imageprocessor_architecture
+        Log.d(TAG, "Creating imageProcessor");
+
+        // Preprocess: rotate + normalize to [-1,1]
         ImageProcessor imageProcessor =
                 new ImageProcessor.Builder()
                         .add(new Rot90Op(-imageRotation / 90))
-                        .add(new NormalizeOp(127.5f, 127.5f))
+                        .add(new NormalizeOp(127.5f, 127.5f)) // scale to [-1,1]
                         .build();
 
-        // Preprocess the image and convert it into a TensorImage for classification.
-        TensorImage tensorImage =
-                imageProcessor.process(TensorImage.fromBitmap(image));
+        Log.d(TAG, "Creating tensorImage");
+        TensorImage tensorImage = imageProcessor.process(TensorImage.fromBitmap(bitmap));
 
-        // Classify the input image
-        imageClassifier.classify(tensorImage);
+        // Allocate output buffer: [1, NUM_CLASSES]
+        Log.d(TAG, "Setting up output");
+        int[] outputShape = interpreter.getOutputTensor(0).shape(); // e.g. [1,1001]
+        float[][] output = new float[outputShape[0]][outputShape[1]];
 
-        List<Classifications> result = imageClassifier.classify(tensorImage);
+        Log.d(TAG, "Running inference");
+        // Run inference
+        interpreter.run(tensorImage.getBuffer(), output);
 
-        inferenceTime = SystemClock.uptimeMillis() - inferenceTime;
-        imageClassifierListener.onResults(result, inferenceTime);
-    }*/
+        long inferenceTime = SystemClock.uptimeMillis() - startTime;
 
-    public static TensorImage convertFloatArrayToTensorImage(float[] pixels, int height, int width, int channels) {
-        TensorImage tensorImage = new TensorImage(org.tensorflow.lite.DataType.FLOAT32);
-        int[] imageShape = {height, width, channels};
-        tensorImage.load(pixels, imageShape);
-        return tensorImage;
+        Log.d(TAG, "Creating results");
+
+        // Postprocess: extract top-K classes
+        List<Classification> results = getTopK(output[0], maxResults, threshold);
+
+        listener.onResults(results, inferenceTime);
     }
 
-    public void classify(float[] floatData, int imageRotation) {
-        /*if (imageClassifier == null) {
-            setupImageClassifier();
-        }*/
+    /** Extract top-K results above threshold */
+    private List<Classification> getTopK(float[] scores, int topK, float threshold) {
+        List<Classification> all = new ArrayList<>();
+        for (int i = 0; i < scores.length; i++) {
+            if (scores[i] >= threshold) {
+                String label = (labels != null && i < labels.size()) ? labels.get(i) : "Unknown";
+                all.add(new Classification(i, label, scores[i]));
+            }
+        }
+        Collections.sort(all, new Comparator<Classification>() {
+            @Override
+            public int compare(Classification a, Classification b) {
+                return Float.compare(b.score, a.score);
+            }
+        });
+        if (all.size() > topK) {
+            return all.subList(0, topK);
+        }
+        return all;
+    }
 
-        TensorImage tensorImage = convertFloatArrayToTensorImage(floatData, 224, 224, 3);
+    public void clearInterpreter() {
+        if (interpreter != null) {
+            interpreter.close();
+            interpreter = null;
+        }
+        if (delegate != null) {
+            delegate.close();
+            delegate = null;
+        }
+    }
 
-        // Inference time is the difference between the system time at the start
-        // and finish of the process
-        long inferenceTime = SystemClock.uptimeMillis();
+    /** Simple result object */
+    public static class Classification {
+        public final int index;
+        public final String label;
+        public final float score;
 
-        float[] output = new float[3];
+        public Classification(int index, String label, float score) {
+            this.index = index;
+            this.label = label;
+            this.score = score;
+        }
 
-        tflite.run(floatData, output);
-
-        inferenceTime = SystemClock.uptimeMillis() - inferenceTime;
+        @Override
+        public String toString() {
+            return label + " (" + score + ")";
+        }
     }
 
     /** Listener for passing results back to calling class */
-    /*public interface ClassifierListener {
+    public interface ClassifierListener {
         void onError(String error);
-
-        void onResults(List<Classifications> results, long inferenceTime);
-    }*/
+        void onResults(List<Classification> results, long inferenceTime);
+    }
 }

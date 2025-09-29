@@ -1,91 +1,70 @@
-[gd_scene load_steps=4 format=3 uid="uid://cg3hylang5fxn"]
+[gd_scene load_steps=3 format=3 uid="uid://cg3hylang5fxn"]
 
 [ext_resource type="Script" uid="uid://c8plt18rbjh5i" path="res://main.gd" id="1_j0gfq"]
 
-[sub_resource type="LabelSettings" id="LabelSettings_h2yge"]
-
 [sub_resource type="LabelSettings" id="LabelSettings_0xm2m"]
 resource_local_to_scene = true
+font_size = 24
 font_color = Color(1, 0, 0, 1)
 
-[node name="Main" type="Node2D" node_paths=PackedStringArray("texture_rect", "status_label", "data_label", "stats_label", "start_stop_button", "classes_label", "exhaling_label", "midrange_label")]
+[node name="Main" type="Node2D" node_paths=PackedStringArray("texture_rect", "status_label", "data_label", "stats_label", "start_stop_button", "exhaling_label")]
 script = ExtResource("1_j0gfq")
 texture_rect = NodePath("TextureRect")
 status_label = NodePath("StatusLabel")
 data_label = NodePath("DataLabel")
 stats_label = NodePath("StatsLabel")
 start_stop_button = NodePath("StartStopButton")
-classes_label = NodePath("ClassesLabel")
 exhaling_label = NodePath("ExhalingLabel")
-midrange_label = NodePath("Midrange")
 
 [node name="StatusLabel" type="Label" parent="."]
 offset_left = -1.0
-offset_top = 96.0
-offset_right = 1149.0
+offset_top = 22.0
+offset_right = 1154.0
 offset_bottom = 251.0
 text = "Camera not connected"
 horizontal_alignment = 1
 
 [node name="DataLabel" type="Label" parent="."]
-offset_left = 2.0
-offset_top = 218.0
-offset_right = 1152.0
-offset_bottom = 432.0
-text = "[Image data]"
+offset_left = 63.0
+offset_top = 241.0
+offset_right = 413.0
+offset_bottom = 591.0
+text = "[Camera data]"
 horizontal_alignment = 1
 
 [node name="StatsLabel" type="Label" parent="."]
-offset_left = 2.0
-offset_top = 369.0
-offset_right = 1152.0
-offset_bottom = 539.0
-text = "[Stats]"
-horizontal_alignment = 1
-
-[node name="ClassesLabel" type="Label" parent="."]
-offset_left = 4.0
-offset_top = 550.0
-offset_right = 1154.0
-offset_bottom = 649.0
-text = "[Classes]"
-label_settings = SubResource("LabelSettings_h2yge")
-horizontal_alignment = 1
-
-[node name="Midrange" type="Label" parent="."]
-offset_left = 5.0
-offset_top = 512.0
-offset_right = 1155.0
-offset_bottom = 611.0
-text = "[Midrange]"
-label_settings = SubResource("LabelSettings_h2yge")
+offset_left = 765.0
+offset_top = 200.0
+offset_right = 1115.0
+offset_bottom = 600.0
+text = "[Image Stats]"
 horizontal_alignment = 1
 
 [node name="ExhalingLabel" type="Label" parent="."]
-offset_left = 4.0
-offset_top = 594.0
-offset_right = 1154.0
-offset_bottom = 649.0
+offset_top = 525.0
+offset_right = 1150.0
+offset_bottom = 645.0
 text = "NOT EXHALING"
 label_settings = SubResource("LabelSettings_0xm2m")
 horizontal_alignment = 1
 
 [node name="TextureRect" type="TextureRect" parent="."]
-offset_left = 796.0
-offset_top = 196.0
-offset_right = 1116.0
-offset_bottom = 516.0
+offset_left = 422.0
+offset_top = 177.0
+offset_right = 742.0
+offset_bottom = 497.0
 
 [node name="StartStopButton" type="Button" parent="."]
-offset_left = 68.0
-offset_top = 180.0
-offset_right = 404.0
-offset_bottom = 299.0
+offset_left = 101.0
+offset_top = 87.0
+offset_right = 387.0
+offset_bottom = 175.0
 disabled = true
 toggle_mode = true
 text = "Start camera"
 
 [node name="OptionButton" type="OptionButton" parent="."]
+visible = false
 offset_left = 71.0
 offset_top = 330.0
 offset_right = 401.0
@@ -130,6 +109,7 @@ popup/item_17/text = "USER4"
 popup/item_17/id = 17
 
 [node name="FlipXCheckButton" type="CheckButton" parent="."]
+visible = false
 offset_left = 87.0
 offset_top = 429.0
 offset_right = 177.0
@@ -137,6 +117,7 @@ offset_bottom = 460.0
 text = "Flip X"
 
 [node name="FlipYCheckButton" type="CheckButton" parent="."]
+visible = false
 offset_left = 88.0
 offset_top = 470.0
 offset_right = 178.0
@@ -144,6 +125,7 @@ offset_bottom = 501.0
 text = "Flip Y"
 
 [node name="ImageSmoothing" type="CheckButton" parent="."]
+visible = false
 offset_left = 88.0
 offset_top = 516.0
 offset_right = 220.0
@@ -151,6 +133,7 @@ offset_bottom = 547.0
 text = "Smoothing"
 
 [node name="Shutter" type="CheckButton" parent="."]
+visible = false
 offset_left = 87.0
 offset_top = 565.0
 offset_right = 219.0

@@ -1,0 +1,9 @@
+[gd_scene load_steps=2 format=3 uid="uid://cldhld6dwreis"]
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_cj2ci"]
+
+[node name="BirthdayCandle" type="Node3D"]
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="."]
+transform = Transform3D(0.032, 0, 0, 0, 0.063, 0, 0, 0, 0.032, 0, 0.063, 0)
+mesh = SubResource("CylinderMesh_cj2ci")

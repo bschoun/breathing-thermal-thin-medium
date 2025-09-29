@@ -50,11 +50,15 @@ dependencies {
     implementation("org.opencv:opencv:4.11.0")
 
     // Tensorflow dependencies
+    //old
     //implementation("org.tensorflow:tensorflow-lite-task-vision:0.4.0")
-    //implementation("org.tensorflow:tensorflow-lite-gpu:2.9.0")
+    implementation("org.tensorflow:tensorflow-lite-gpu:2.9.0")
+    //implementation("org.tensorflow:tensorflow-lite-gpu-delegate-plugin:0.4.0")
+
+    //new
     implementation("org.tensorflow:tensorflow-lite:2.17.0")
     implementation("org.tensorflow:tensorflow-lite-support:0.5.0")
-    //implementation("org.tensorflow:tensorflow-lite-gpu-delegate-plugin:0.4.0")
+
 
     // Seek Thermal dependency
     api(project(":seek-thermal"))
@@ -68,11 +72,25 @@ val copyDebugAARToDemoAddons by tasks.registering(Copy::class) {
     into("demo/addons/$pluginName/bin/debug")
 }
 
+val copyDebugAARToBreathingLabAddons by tasks.registering(Copy::class) {
+    description = "Copies the generated debug AAR binary to the plugin's addons directory"
+    from("build/outputs/aar")
+    include("$pluginName-debug.aar")
+    into("breathing-lab/addons/$pluginName/bin/debug")
+}
+
 val copySeekThermalDebugAARToDemoAddons by tasks.registering(Copy::class) {
     description = "Copies the Seek Thermal AAR binary to the plugin's addons directory"
     from("../seek-thermal")
     include("seek_android_sdk_4.3.0.2.aar")
     into("demo/addons/$pluginName/bin/debug")
+}
+
+val copySeekThermalDebugAARToBreathingLabAddons by tasks.registering(Copy::class) {
+    description = "Copies the Seek Thermal AAR binary to the plugin's addons directory"
+    from("../seek-thermal")
+    include("seek_android_sdk_4.3.0.2.aar")
+    into("breathing-lab/addons/$pluginName/bin/debug")
 }
 
 val copyReleaseAARToDemoAddons by tasks.registering(Copy::class) {
@@ -82,6 +100,13 @@ val copyReleaseAARToDemoAddons by tasks.registering(Copy::class) {
     into("demo/addons/$pluginName/bin/release")
 }
 
+val copyReleaseAARToBreathingLabAddons by tasks.registering(Copy::class) {
+    description = "Copies the generated release AAR binary to the plugin's addons directory"
+    from("build/outputs/aar")
+    include("$pluginName-release.aar")
+    into("breathing-lab/addons/$pluginName/bin/release")
+}
+
 val copySeekThermalReleaseAARToDemoAddons by tasks.registering(Copy::class) {
     description = "Copies the Seek Thermal AAR binary to the plugin's addons directory"
     from("../seek-thermal")
@@ -89,8 +114,19 @@ val copySeekThermalReleaseAARToDemoAddons by tasks.registering(Copy::class) {
     into("demo/addons/$pluginName/bin/release")
 }
 
+val copySeekThermalReleaseAARToBreathingLabAddons by tasks.registering(Copy::class) {
+    description = "Copies the Seek Thermal AAR binary to the plugin's addons directory"
+    from("../seek-thermal")
+    include("seek_android_sdk_4.3.0.2.aar")
+    into("breathing-lab/addons/$pluginName/bin/release")
+}
+
 val cleanDemoAddons by tasks.registering(Delete::class) {
     delete("demo/addons/$pluginName")
+}
+
+val cleanBreathingLabAddons by tasks.registering(Delete::class) {
+    delete("breathing-lab/addons/$pluginName")
 }
 
 val copyAddonsToDemo by tasks.registering(Copy::class) {
@@ -108,10 +144,27 @@ val copyAddonsToDemo by tasks.registering(Copy::class) {
     into("demo/addons/$pluginName")
 }
 
+val copyAddonsToBreathingLab by tasks.registering(Copy::class) {
+    description = "Copies the export scripts templates to the plugin's addons directory"
+
+    dependsOn(cleanBreathingLabAddons)
+    finalizedBy(copyDebugAARToBreathingLabAddons)
+    finalizedBy(copyReleaseAARToBreathingLabAddons)
+
+    // Copies seek thermal AAR
+    finalizedBy(copySeekThermalDebugAARToBreathingLabAddons)
+    finalizedBy(copySeekThermalReleaseAARToBreathingLabAddons)
+
+    from("export_scripts_template")
+    into("breathing-lab/addons/$pluginName")
+}
+
 tasks.named("assemble").configure {
     finalizedBy(copyAddonsToDemo)
+    finalizedBy(copyAddonsToBreathingLab)
 }
 
 tasks.named<Delete>("clean").apply {
     dependsOn(cleanDemoAddons)
+    dependsOn(cleanBreathingLabAddons)
 }
